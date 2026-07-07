@@ -43,6 +43,34 @@ class AuthController extends Controller
         return response()->json(['user' => $user, 'token' => $token]);
     }
 
+    /**
+     * Lupa Password: Memperbarui password berdasarkan email.
+     */
+    public function forgotPassword(Request $request)
+    {
+        // 1. Validasi input dari request
+        $request->validate([
+            'email' => 'required|email|exists:users,email', // Pastikan email valid dan ada di database
+            'password' => 'required|string|min:8', // Anda bisa menambahkan aturan 'confirmed' jika menggunakan form konfirmasi password
+        ], [
+            'email.exists' => 'Email tidak ditemukan di sistem kami.',
+        ]);
+
+        // 2. Cari user berdasarkan email
+        $user = User::where('email', $request->email)->first();
+
+        // 3. Update password user (jangan lupa di-hash)
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        // 4. Kembalikan response sukses
+        return response()->json([
+            'success' => true,
+            'message' => 'Password berhasil diperbarui. Silakan login dengan password baru Anda.'
+        ], 200);
+    }
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();

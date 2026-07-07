@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Route;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// TAMBAHKAN ROUTE LUPA PASSWORD DI SINI
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+
 // RUTE BARU: Endpoint khusus untuk menerima sinyal tutup browser dari Next.js Beacon
 Route::post('/logout-beacon', [AuthController::class, 'logoutBeacon']);
 
