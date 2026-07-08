@@ -13,7 +13,7 @@ class ProductController extends Controller
     // READ: Ambil semua produk
     public function index()
     {
-        $products = Product::all();
+        $products = Product::orderBy('id', 'asc')->get();
         return response()->json(['success' => true, 'data' => $products], 200);
     }
 
