@@ -15,21 +15,12 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-
-    'allowed_methods' => ['*'],
-
-    // Izinkan origin dari Next.js Anda. Jika pakai '*', pastikan supports_credentials bernilai false
-    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000', '*'],
-
+    'paths' => ['api/*', 'sanctum/csrf-cookie', '*'], // Izinkan route api
+    'allowed_methods' => ['*'], // Izinkan GET, POST, dll
+    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000'], // Masukkan URL Next.js kamu
     'allowed_origins_patterns' => [],
-
-    // INI YANG PALING PENTING: Harus mengizinkan semua header atau setidaknya 'Authorization'
     'allowed_headers' => ['*'],
-
     'exposed_headers' => [],
-
     'max_age' => 0,
-
-    'supports_credentials' => false, // Set ke false jika menggunakan Bearer Token biasa, bukan Cookie
+    'supports_credentials' => true,
 ];

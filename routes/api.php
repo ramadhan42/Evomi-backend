@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\QuizController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\DisclaimerController;
+use App\Http\Controllers\Api\KurirController;
+use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\Api\OrderTrackingController;
 use Illuminate\Support\Facades\Route;
@@ -42,12 +45,24 @@ Route::post('/contact', [ContactMessageController::class, 'store']);
 
 
 Route::prefix('trackings')->group(function () {
-    Route::get('/', [OrderTrackingController::class, 'index']); // Mendapatkan semua data
-    Route::post('/', [OrderTrackingController::class, 'store']); // Membuat data baru
+    Route::get('/', [OrderTrackingController::class, 'index']);           // Mendapatkan semua data
+    Route::post('/', [OrderTrackingController::class, 'store']);          // Membuat data baru
     Route::get('/{order_id}', [OrderTrackingController::class, 'show']); // Detail data spesifik
     Route::put('/{order_id}', [OrderTrackingController::class, 'update']); // Memperbarui data (Update)
     Route::delete('/{order_id}', [OrderTrackingController::class, 'destroy']); // Menghapus data
 });
+
+// Disclaimer (Public: Read)
+Route::get('/disclaimers', [DisclaimerController::class, 'index']);
+Route::get('/disclaimers/{id}', [DisclaimerController::class, 'show']);
+
+// Kurir (Public: Read)
+Route::get('/kurirs', [KurirController::class, 'index']);
+Route::get('/kurirs/{id}', [KurirController::class, 'show']);
+
+// Promo (Public: Read)
+Route::get('/promos', [PromoController::class, 'index']);
+Route::get('/promos/{id}', [PromoController::class, 'show']);
 
 // ==========================================
 // ADMIN DASHBOARD ROUTES
@@ -65,6 +80,21 @@ Route::prefix('admin')->group(function () {
 
     // Endpoint untuk melihat semua email subscriber
     Route::get('/subscribers', [NewsletterController::class, 'index']);
+
+    // Manajemen Disclaimer (Admin only)
+    Route::post('/disclaimers', [DisclaimerController::class, 'store']);
+    Route::put('/disclaimers/{id}', [DisclaimerController::class, 'update']);
+    Route::delete('/disclaimers/{id}', [DisclaimerController::class, 'destroy']);
+
+    // Manajemen Kurir (Admin only)
+    Route::post('/kurirs', [KurirController::class, 'store']);
+    Route::put('/kurirs/{id}', [KurirController::class, 'update']);
+    Route::delete('/kurirs/{id}', [KurirController::class, 'destroy']);
+
+    // Manajemen Promo (Admin only)
+    Route::post('/promos', [PromoController::class, 'store']);
+    Route::put('/promos/{id}', [PromoController::class, 'update']);
+    Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
 });
 
 // Protected Routes (Butuh Login)

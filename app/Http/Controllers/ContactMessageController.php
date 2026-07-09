@@ -17,14 +17,14 @@ class ContactMessageController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil mengambil semua data pesan.',
-                'data'    => $messages
+                'data' => $messages
             ], 200);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat mengambil data.',
-                'error'   => $e->getMessage()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -33,8 +33,8 @@ class ContactMessageController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'    => 'required|string|max:255',
-            'email'   => 'required|email|max:255',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
             'subject' => 'required|string|max:255',
             'message' => 'required|string',
         ]);
@@ -45,9 +45,9 @@ class ContactMessageController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Pesan berhasil dikirim! Tim kami akan segera menghubungi Anda.',
-                'data'    => $contact
+                'data' => $contact
             ], 201);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

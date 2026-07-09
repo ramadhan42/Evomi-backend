@@ -21,7 +21,7 @@ class ProductController extends Controller
     public function show($id)
     {
         $product = Product::find($id);
-        
+
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan'], 404);
         }
@@ -35,7 +35,7 @@ class ProductController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'color' => 'nullable|string|max:50', // <--- TAMBAHKAN VALIDASI COLOR DI SINI
+            'color' => 'nullable|string|max:50',
             'price' => 'required|numeric',
             'personality_type' => 'nullable|in:prestige,peaceful_calm,rebel_brave,sweet_shy',
             'top_note' => 'nullable|string|max:255',
@@ -51,6 +51,13 @@ class ProductController extends Controller
             'gender' => 'required|in:unisex,male,female',
             'quantity' => 'integer',
             'stock_status' => 'in:tersedia,minim,habis',
+            // Field produk baru
+            'alamat_awal_pengiriman' => 'nullable|string|max:255',
+            'kondisi' => 'nullable|string|max:100',
+            'kategori' => 'nullable|string|max:100',
+            'berat_satuan' => 'nullable|numeric|min:0',
+            'brand' => 'nullable|string|max:100',
+            'etalase' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -70,8 +77,8 @@ class ProductController extends Controller
         $product = Product::create($data);
 
         return response()->json([
-            'success' => true, 
-            'message' => 'Produk berhasil ditambahkan', 
+            'success' => true,
+            'message' => 'Produk berhasil ditambahkan',
             'data' => $product
         ], 201);
     }
@@ -86,10 +93,10 @@ class ProductController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'title' => 'string|max:255',
-            'description' => 'string',
-            'color' => 'nullable|string|max:50', // <--- TAMBAHKAN VALIDASI COLOR DI SINI
-            'price' => 'numeric',
+            'title' => 'sometimes|required|string|max:255',
+            'description' => 'sometimes|required|string',
+            'color' => 'nullable|string|max:50',
+            'price' => 'sometimes|required|numeric',
             'personality_type' => 'nullable|in:prestige,peaceful_calm,rebel_brave,sweet_shy',
             'top_note' => 'nullable|string|max:255',
             'middle_note' => 'nullable|string|max:255',
@@ -99,11 +106,18 @@ class ProductController extends Controller
             'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_produk_belanja' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'bottle_size' => 'integer',
-            'perfume_type' => 'string|max:255',
-            'gender' => 'in:unisex,male,female',
+            'bottle_size' => 'sometimes|required|integer',
+            'perfume_type' => 'sometimes|required|string|max:255',
+            'gender' => 'sometimes|required|in:unisex,male,female',
             'quantity' => 'integer',
             'stock_status' => 'in:tersedia,minim,habis',
+            // Field produk baru
+            'alamat_awal_pengiriman' => 'nullable|string|max:255',
+            'kondisi' => 'nullable|string|max:100',
+            'kategori' => 'nullable|string|max:100',
+            'berat_satuan' => 'nullable|numeric|min:0',
+            'brand' => 'nullable|string|max:100',
+            'etalase' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -127,8 +141,8 @@ class ProductController extends Controller
         $product->update($data);
 
         return response()->json([
-            'success' => true, 
-            'message' => 'Produk berhasil diupdate', 
+            'success' => true,
+            'message' => 'Produk berhasil diupdate',
             'data' => $product
         ], 200);
     }

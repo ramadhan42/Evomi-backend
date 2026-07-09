@@ -28,5 +28,11 @@ class Product extends Model
         'gender',
         'quantity',
         'stock_status',
+        'alamat_awal_pengiriman',
+        'kondisi',
+        'kategori',
+        'berat_satuan',
+        'brand',
+        'etalase',
     ];
 }
