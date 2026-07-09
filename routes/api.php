@@ -40,6 +40,9 @@ Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
 // Endpoint untuk mengambil semua pesan (GET)
 Route::get('/contact', [ContactMessageController::class, 'index']);
 
+// Endpoint untuk mengambil semua pesan (GET)
+Route::get('/contact-show', [ContactMessageController::class, 'show']);
+
 // Endpoint untuk mengirim pesan baru (POST)
 Route::post('/contact', [ContactMessageController::class, 'store']);
 

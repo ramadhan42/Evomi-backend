@@ -29,6 +29,22 @@ class ContactMessageController extends Controller
         }
     }
 
+    public function show(Request $request)
+{
+    // Ambil email dari query string (dikirim dari Next.js)
+    $email = $request->query('email');
+
+    // Jika email ada, ambil pesan milik user tersebut. 
+    // Jika tidak ada (admin), ambil semua.
+    if ($email) {
+        $messages = ContactMessage::where('email', $email)->orderBy('created_at', 'asc')->get();
+    } else {
+        $messages = ContactMessage::orderBy('created_at', 'asc')->get();
+    }
+
+    return response()->json(['success' => true, 'data' => $messages], 200);
+}
+
     // Fungsi POST untuk menyimpan pesan baru (yang sudah Anda buat)
     public function store(Request $request)
     {
