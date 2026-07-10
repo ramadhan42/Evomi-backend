@@ -46,6 +46,9 @@ Route::get('/contact-show', [ContactMessageController::class, 'show']);
 // Endpoint untuk mengirim pesan baru (POST)
 Route::post('/contact', [ContactMessageController::class, 'store']);
 
+Route::get('/contact/unread-count', [ContactMessageController::class, 'getUnreadCount']);
+Route::post('/contact/mark-read', [ContactMessageController::class, 'markUserRead']);
+
 
 Route::prefix('trackings')->group(function () {
     Route::get('/', [OrderTrackingController::class, 'index']);           // Mendapatkan semua data
@@ -98,6 +101,9 @@ Route::prefix('admin')->group(function () {
     Route::post('/promos', [PromoController::class, 'store']);
     Route::put('/promos/{id}', [PromoController::class, 'update']);
     Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
+
+    // Rute untuk membalas pesan Contact
+    Route::post('/contact/{id}/reply', [ContactMessageController::class, 'reply']);
 });
 
 // Protected Routes (Butuh Login)

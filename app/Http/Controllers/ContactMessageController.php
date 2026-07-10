@@ -3,20 +3,42 @@
 namespace App\Http\Controllers;
 
 use App\Models\ContactMessage;
+use App\Models\ContactReply;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ContactMessageController extends Controller
 {
-    // Fungsi GET untuk menampilkan semua pesan
-    public function index()
+    /**
+     * Menampilkan semua data pesan beserta riwayat balasannya untuk Admin.
+     */
+    /**
+     * Menampilkan data pesan.
+     * Filter berdasarkan email untuk User, atau tampilkan semua untuk Admin.
+     */
+    public function index(Request $request)
     {
         try {
-            // Mengambil semua data pesan, diurutkan dari yang paling baru
-            $messages = ContactMessage::orderBy('created_at', 'desc')->get();
+            // 1. Tangkap parameter email dari URL (dikirim oleh frontend Next.js)
+            $email = $request->query('email');
+
+            // 2. Jika parameter email ADA (Berarti ini User di halaman Chat Profile)
+            if ($email) {
+                $messages = ContactMessage::with('replies')
+                    ->where('email', $email) // HANYA ambil pesan milik email user ini
+                    ->orderBy('created_at', 'asc') // Urutan kronologis obrolan (lama ke baru)
+                    ->get();
+            }
+            // 3. Jika TIDAK ADA parameter email (Berarti ini Admin di halaman Dashboard)
+            else {
+                $messages = ContactMessage::with('replies')
+                    ->orderBy('created_at', 'desc') // Urutan untuk tabel admin (baru ke lama)
+                    ->get();
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Berhasil mengambil semua data pesan.',
+                'message' => 'Berhasil mengambil data pesan.',
                 'data' => $messages
             ], 200);
 
@@ -28,24 +50,41 @@ class ContactMessageController extends Controller
             ], 500);
         }
     }
-
+    /**
+     * Menampilkan pesan berdasarkan filter email tertentu atau semua.
+     */
     public function show(Request $request)
-{
-    // Ambil email dari query string (dikirim dari Next.js)
-    $email = $request->query('email');
+    {
+        $email = $request->query('email');
 
-    // Jika email ada, ambil pesan milik user tersebut. 
-    // Jika tidak ada (admin), ambil semua.
-    if ($email) {
-        $messages = ContactMessage::where('email', $email)->orderBy('created_at', 'asc')->get();
-    } else {
-        $messages = ContactMessage::orderBy('created_at', 'asc')->get();
+        try {
+            if ($email) {
+                $messages = ContactMessage::with('replies')
+                    ->where('email', $email)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+            } else {
+                $messages = ContactMessage::with('replies')
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $messages
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    return response()->json(['success' => true, 'data' => $messages], 200);
-}
-
-    // Fungsi POST untuk menyimpan pesan baru (yang sudah Anda buat)
+    /**
+     * Menyimpan pesan baru dari form contact website (Public).
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -69,6 +108,97 @@ class ContactMessageController extends Controller
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat mengirim pesan. Silakan coba lagi.'
             ], 500);
+        }
+    }
+
+    /**
+     * Fungsi POST untuk membalas pesan pelanggan berkali-kali (Admin Only).
+     * Endpoint: POST /api/admin/contact/{id}/reply
+     */
+    public function reply(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'reply_message' => 'required|string',
+        ]);
+
+        try {
+            $message = ContactMessage::findOrFail($id);
+
+            // Membuat record baru ke tabel contact_replies tanpa membatasi jumlah baris
+            $reply = $message->replies()->create([
+                'reply_message' => $validated['reply_message'],
+                'replied_by' => Auth::id() ?? 1 // Fallback ke ID 1 jika belum ter-auth penuh
+            ]);
+
+            // Load ulang relasi agar response mengembalikan thread chat terbaru lengkap
+            $message->load('replies');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Balasan berhasil dikirim.',
+                'data' => $message
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengirim balasan.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mengambil jumlah balasan admin yang belum dibaca oleh user.
+     */
+    public function getUnreadCount(Request $request)
+    {
+        $email = $request->query('email');
+        if (!$email) {
+            return response()->json(['count' => 0]);
+        }
+
+        // GUNAKAN false (bukan 0) UNTUK POSTGRESQL
+        $count = ContactReply::where(function ($q) {
+            $q->where('is_read_by_user', false)
+                ->orWhereNull('is_read_by_user');
+        })
+            ->whereHas('contactMessage', function ($query) use ($email) {
+                $query->where('email', $email);
+            })->count();
+
+        return response()->json(['success' => true, 'count' => $count]);
+    }
+
+    /**
+     * Menandai semua balasan admin sebagai "Telah Dibaca" oleh user.
+     */
+    /**
+     * Menandai semua balasan admin sebagai "Telah Dibaca" oleh user.
+     */
+    public function markUserRead(Request $request)
+    {
+        $email = $request->input('email');
+        if (!$email) {
+            return response()->json(['success' => false, 'message' => 'Email tidak valid']);
+        }
+
+        try {
+            $messageIds = ContactMessage::where('email', $email)->pluck('id');
+
+            ContactReply::whereIn('contact_message_id', $messageIds)
+                ->where(function ($q) {
+                    // PASTIKAN MENGGUNAKAN false DI SINI UNTUK POSTGRESQL
+                    $q->where('is_read_by_user', false)
+                        ->orWhereNull('is_read_by_user');
+                })
+                // PASTIKAN MENGGUNAKAN true DI SINI UNTUK POSTGRESQL
+                ->update(['is_read_by_user' => true]);
+
+            return response()->json(['success' => true]);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
 }

@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('contact_messages', function (Blueprint $table) {
@@ -14,6 +13,9 @@ return new class extends Migration
             $table->string('email');
             $table->string('subject');
             $table->text('message');
+
+            // Tambahkan di dalam migration create_contact_messages_table
+            $table->boolean('is_read_by_admin')->default(false)->after('message');
             $table->timestamps();
         });
     }
@@ -22,4 +24,6 @@ return new class extends Migration
     {
         Schema::dropIfExists('contact_messages');
     }
+
+
 };
