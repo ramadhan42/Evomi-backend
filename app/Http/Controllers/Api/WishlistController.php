@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Wishlist;
+use App\Support\LocaleResolver;
+use App\Support\ProductLocalizer;
 use Illuminate\Http\Request;
 
 class WishlistController extends Controller
@@ -11,9 +13,12 @@ class WishlistController extends Controller
     // Mengambil data wishlist milik user yang sedang login
     public function index(Request $request)
     {
-        return Wishlist::where('user_id', $request->user()->id)
-            ->with('product') // Memuat data produk terkait
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
+        $wishlists = Wishlist::where('user_id', $request->user()->id)
+            ->with('product')
             ->get();
+
+        return ProductLocalizer::mapWithProduct($wishlists, $locale);
     }
 
     /**
@@ -28,6 +33,33 @@ class WishlistController extends Controller
             'success' => true,
             'message' => 'Semua data wishlist berhasil diambil.',
             'data' => $wishlists
+        ], 200);
+    }
+
+    /**
+     * GET /api/wishlists/{id} | /api/wishlist/{id}
+     */
+    public function show($id, Request $request)
+    {
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
+        $wishlist = Wishlist::with('product')
+            ->where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$wishlist) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wishlist tidak ditemukan.',
+            ], 404);
+        }
+
+        $data = $wishlist->toArray();
+        $data['product'] = ProductLocalizer::localize($wishlist->product, $locale);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
         ], 200);
     }
 
@@ -72,7 +104,7 @@ class WishlistController extends Controller
         // Cek otorisasi:
         // User ID 1 adalah admin (bisa hapus semua)
         // User lain hanya bisa hapus jika wishlist milik mereka sendiri
-        if (auth()->id() !== 1 && $wishlist->user_id !== auth()->id()) {
+        if (!auth()->user()?->is_admin && $wishlist->user_id !== auth()->id()) {
             return response()->json(['message' => 'Anda tidak diizinkan menghapus item ini.'], 403);
         }
 

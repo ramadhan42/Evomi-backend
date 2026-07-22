@@ -18,11 +18,16 @@ class OrderTracking extends Model
         'recipient_name',
         'recipient_phone',
         'recipient_address',
-        'timeline'
+        'timeline',
     ];
 
     protected $casts = [
         'estimated_delivery' => 'date',
-        'timeline' => 'array', // Otomatis mengubah JSONB PostgreSQL menjadi Array PHP
+        'timeline' => 'array',
     ];
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class, 'order_id', 'id');
+    }
 }

@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('recipient_phone');
             $table->text('recipient_address');
             
-            // Riwayat Perjalanan menggunakan JSONB (Optimal untuk PostgreSQL)
-            $table->jsonb('timeline')->default('[]'); 
+            // JSON portable (MySQL/MariaDB/PostgreSQL via Laravel)
+            $table->json('timeline')->nullable(); 
             
             $table->timestamps();
         });

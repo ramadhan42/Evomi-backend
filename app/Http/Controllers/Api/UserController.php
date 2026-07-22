@@ -102,7 +102,14 @@ class UserController extends Controller
             ], 404);
         }
 
-        // Opsional: Mencegah admin menghapus dirinya sendiri dari tabel ini
+        // Mencegah hapus admin / diri sendiri
+        if ($user->is_admin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun admin tidak dapat dihapus.'
+            ], 403);
+        }
+
         if (auth()->check() && auth()->id() === $user->id) {
             return response()->json([
                 'success' => false,
@@ -130,13 +137,15 @@ class UserController extends Controller
     public function shoppingHistory(Request $request)
     {
         $user = $request->user();
+        $locale = \App\Support\LocaleResolver::normalize($request->query('locale', 'id'));
 
-        // Pastikan namespace Model Order sesuai dengan lokasi file Anda
-        $history = \App\Models\Order::with('product') // Eager loading untuk mengambil data produk
-            ->where('user_id', $user->id)             // Memastikan hanya mengambil data milik user yang login
-            ->orderBy('created_at', 'desc')           // Urutkan dari yang terbaru
+        $history = \App\Models\Order::with('product')
+            ->where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json($history);
+        return response()->json(
+            \App\Support\ProductLocalizer::mapWithProduct($history, $locale)
+        );
     }
 }

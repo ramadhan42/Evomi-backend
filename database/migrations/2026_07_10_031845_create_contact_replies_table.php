@@ -13,9 +13,7 @@ return new class extends Migration {
             $table->foreignId('contact_message_id')->constrained('contact_messages')->onDelete('cascade');
             $table->text('reply_message');
             $table->unsignedBigInteger('replied_by')->nullable(); // ID Admin
-
-            // Tambahkan di dalam migration create_contact_replies_table
-            $table->boolean('is_read_by_user')->default(false)->after('reply_message');
+            $table->boolean('is_read_by_user')->default(false);
             $table->timestamps();
         });
     }

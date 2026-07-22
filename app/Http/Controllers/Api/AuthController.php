@@ -22,7 +22,8 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => $request->password,
+            'is_admin' => false,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -39,8 +40,16 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => ['Kredensial salah.']]);
         }
 
+        // Pastikan email admin dari .env selalu punya flag is_admin
+        $adminEmail = config('evomi.development_admin.email');
+        if (is_string($adminEmail) && $adminEmail !== '' && strcasecmp($user->email, $adminEmail) === 0) {
+            if (!$user->is_admin) {
+                $user->forceFill(['is_admin' => true])->save();
+            }
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json(['user' => $user, 'token' => $token]);
+        return response()->json(['user' => $user->fresh(), 'token' => $token]);
     }
 
     /**
@@ -61,7 +70,7 @@ class AuthController extends Controller
 
         // 3. Update password user (jangan lupa di-hash)
         $user->update([
-            'password' => Hash::make($request->password),
+            'password' => $request->password,
         ]);
 
         // 4. Kembalikan response sukses

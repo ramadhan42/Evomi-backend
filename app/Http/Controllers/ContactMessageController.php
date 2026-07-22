@@ -19,20 +19,25 @@ class ContactMessageController extends Controller
     public function index(Request $request)
     {
         try {
-            // 1. Tangkap parameter email dari URL (dikirim oleh frontend Next.js)
             $email = $request->query('email');
 
-            // 2. Jika parameter email ADA (Berarti ini User di halaman Chat Profile)
-            if ($email) {
+            // Tanpa email = daftar semua pesan → hanya admin (Bearer token)
+            if (!$email) {
+                $user = auth('sanctum')->user();
+                if (!$user || !$user->is_admin) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Akses ditolak. Login sebagai admin atau sertakan parameter email.',
+                    ], 403);
+                }
+
                 $messages = ContactMessage::with('replies')
-                    ->where('email', $email) // HANYA ambil pesan milik email user ini
-                    ->orderBy('created_at', 'asc') // Urutan kronologis obrolan (lama ke baru)
+                    ->orderBy('created_at', 'desc')
                     ->get();
-            }
-            // 3. Jika TIDAK ADA parameter email (Berarti ini Admin di halaman Dashboard)
-            else {
+            } else {
                 $messages = ContactMessage::with('replies')
-                    ->orderBy('created_at', 'desc') // Urutan untuk tabel admin (baru ke lama)
+                    ->where('email', $email)
+                    ->orderBy('created_at', 'asc')
                     ->get();
             }
 

@@ -13,9 +13,7 @@ return new class extends Migration {
             $table->string('email');
             $table->string('subject');
             $table->text('message');
-
-            // Tambahkan di dalam migration create_contact_messages_table
-            $table->boolean('is_read_by_admin')->default(false)->after('message');
+            $table->boolean('is_read_by_admin')->default(false);
             $table->timestamps();
         });
     }

@@ -62,7 +62,12 @@ class OrderTrackingController extends Controller
      */
     public function show($orderId)
     {
+        // Exact match, atau base invoice (INV-123 dari INV-123-1)
         $tracking = OrderTracking::where('order_id', $orderId)->first();
+
+        if (!$tracking && preg_match('/^(.+)-\d+$/', $orderId, $matches)) {
+            $tracking = OrderTracking::where('order_id', $matches[1])->first();
+        }
 
         if (!$tracking) {
             return response()->json([

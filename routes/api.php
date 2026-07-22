@@ -1,148 +1,167 @@
 <?php
 
-// Controller Library
-use App\Http\Controllers\Api\NewsletterController;
-use App\Http\Controllers\Api\WishlistController;
-use App\Http\Controllers\Api\ProductController;
-use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
-use App\Http\Controllers\Api\QuizController;
-use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\CmsController;
 use App\Http\Controllers\Api\DisclaimerController;
 use App\Http\Controllers\Api\KurirController;
-use App\Http\Controllers\Api\PromoController;
-use App\Http\Controllers\ContactMessageController;
+use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderTrackingController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PromoController;
+use App\Http\Controllers\Api\QuizAdminController;
+use App\Http\Controllers\Api\QuizController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WishlistController;
+use App\Http\Controllers\ContactMessageController;
 use Illuminate\Support\Facades\Route;
 
-// Public Routes
+/*
+|--------------------------------------------------------------------------
+| Public routes
+|--------------------------------------------------------------------------
+*/
 
-// Login & Register, AuthController
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-
-// TAMBAHKAN ROUTE LUPA PASSWORD DI SINI
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-
-// RUTE BARU: Endpoint khusus untuk menerima sinyal tutup browser dari Next.js Beacon
 Route::post('/logout-beacon', [AuthController::class, 'logoutBeacon']);
 
-// Katalog Produk (Public)
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
 Route::get('/quiz/questions', [QuizController::class, 'getQuestions']);
+Route::get('/quiz/results', [QuizController::class, 'getResults']);
 
-// Route untuk pendaftaran buletin footer
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe']);
 
-// Endpoint untuk mengambil semua pesan (GET)
+// Contact: kirim pesan public; list butuh auth (lihat controller)
 Route::get('/contact', [ContactMessageController::class, 'index']);
-
-// Endpoint untuk mengambil semua pesan (GET)
 Route::get('/contact-show', [ContactMessageController::class, 'show']);
-
-// Endpoint untuk mengirim pesan baru (POST)
 Route::post('/contact', [ContactMessageController::class, 'store']);
-
 Route::get('/contact/unread-count', [ContactMessageController::class, 'getUnreadCount']);
 Route::post('/contact/mark-read', [ContactMessageController::class, 'markUserRead']);
 
+// Tracking: public read (lacak paket), write di auth
+Route::get('/trackings/{order_id}', [OrderTrackingController::class, 'show']);
 
-Route::prefix('trackings')->group(function () {
-    Route::get('/', [OrderTrackingController::class, 'index']);           // Mendapatkan semua data
-    Route::post('/', [OrderTrackingController::class, 'store']);          // Membuat data baru
-    Route::get('/{order_id}', [OrderTrackingController::class, 'show']); // Detail data spesifik
-    Route::put('/{order_id}', [OrderTrackingController::class, 'update']); // Memperbarui data (Update)
-    Route::delete('/{order_id}', [OrderTrackingController::class, 'destroy']); // Menghapus data
-});
-
-// Disclaimer (Public: Read)
 Route::get('/disclaimers', [DisclaimerController::class, 'index']);
 Route::get('/disclaimers/{id}', [DisclaimerController::class, 'show']);
-
-// Kurir (Public: Read)
 Route::get('/kurirs', [KurirController::class, 'index']);
 Route::get('/kurirs/{id}', [KurirController::class, 'show']);
-
-// Promo (Public: Read)
 Route::get('/promos', [PromoController::class, 'index']);
 Route::get('/promos/{id}', [PromoController::class, 'show']);
 
-// ==========================================
-// ADMIN DASHBOARD ROUTES
-// ==========================================
-Route::prefix('admin')->group(function () {
-    Route::get('/orders', [OrderController::class, 'getAllOrders']);
-    Route::get('/carts', [CartController::class, 'getAllCarts']);
-    Route::get('/wishlists', [WishlistController::class, 'getAllWishlists']);
+Route::get('/cms/faqs', [CmsController::class, 'publicFaqs']);
+Route::get('/cms/{page}', [CmsController::class, 'showPage']);
 
-    // RUTE BARU:
-    Route::get('/users', [UserController::class, 'getAllUsers']);
-    Route::get('/revenue', [OrderController::class, 'getTotalRevenue']);
-
-    Route::delete('/users/{id}', [UserController::class, 'destroyByAdmin']);
-
-    // Endpoint untuk melihat semua email subscriber
-    Route::get('/subscribers', [NewsletterController::class, 'index']);
-
-    // Manajemen Disclaimer (Admin only)
-    Route::post('/disclaimers', [DisclaimerController::class, 'store']);
-    Route::put('/disclaimers/{id}', [DisclaimerController::class, 'update']);
-    Route::delete('/disclaimers/{id}', [DisclaimerController::class, 'destroy']);
-
-    // Manajemen Kurir (Admin only)
-    Route::post('/kurirs', [KurirController::class, 'store']);
-    Route::put('/kurirs/{id}', [KurirController::class, 'update']);
-    Route::delete('/kurirs/{id}', [KurirController::class, 'destroy']);
-
-    // Manajemen Promo (Admin only)
-    Route::post('/promos', [PromoController::class, 'store']);
-    Route::put('/promos/{id}', [PromoController::class, 'update']);
-    Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
-
-    // Rute untuk membalas pesan Contact
-    Route::post('/contact/{id}/reply', [ContactMessageController::class, 'reply']);
-});
-
-// Protected Routes (Butuh Login)
+/*
+|--------------------------------------------------------------------------
+| Protected routes (Sanctum)
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth:sanctum')->group(function () {
-
-    // Logout, Authcontroller
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Rute Manajemen Profil User, UserController
-    Route::get('/user/profile', [UserController::class, 'show']);       // Endpoint untuk Ambil Profil (Read)
-    Route::post('/user/profile', [UserController::class, 'update']);    // Endpoint untuk Update Profil (Update)
-    Route::delete('/user/profile', [UserController::class, 'destroy']); // Endpoint untuk Hapus Akun (Delete)
-    // Route::get('/profile', [UserController::class, 'profile']);
+    Route::get('/user/profile', [UserController::class, 'show']);
+    Route::post('/user/profile', [UserController::class, 'update']);
+    Route::put('/user/profile', [UserController::class, 'update']);
+    Route::delete('/user/profile', [UserController::class, 'destroy']);
 
-    // Product Management (Idealnya ini diberi middleware khusus admin), ProductController
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::post('/products/{id}', [ProductController::class, 'update']); // Menggunakan POST agar Form-Data file bisa terbaca
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    // Alias lama yang masih dipakai beberapa helper frontend
+    Route::get('/profile', [UserController::class, 'show']);
 
-    // Cart & Wishlist// Tambahkan atau pastikan ini ada di api.php di dalam middleware auth:sanctum
     Route::apiResource('carts', CartController::class)->only(['index', 'store', 'destroy', 'update']);
     Route::apiResource('wishlists', WishlistController::class)->only(['index', 'store', 'destroy']);
+    Route::get('/wishlists/{wishlist}', [WishlistController::class, 'show']);
+    // Alias singular (frontend getWishlistDetail)
+    Route::get('/wishlist/{wishlist}', [WishlistController::class, 'show']);
 
-    // Quiz Actions, QuizController
     Route::post('/quiz/submit', [QuizController::class, 'submitQuiz']);
     Route::get('/quiz/history', [QuizController::class, 'history']);
 
-    // Shopping Needs
     Route::get('/shopping-history', [UserController::class, 'shoppingHistory']);
 
-    // Order Controller
-    // MASUKKAN KE SINI (Di dalam blok auth:sanctum)
     Route::post('/checkout', [OrderController::class, 'checkout']);
     Route::patch('/orders/{id}/confirm', [OrderController::class, 'confirmReceipt']);
     Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    // Alias history detail
+    Route::get('/history/{id}', [OrderController::class, 'show']);
 
-    // Tambahkan rute ini untuk mengubah status via Postman (Simulasi Admin)
-    Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    // Checkout membuat tracking setelah bayar
+    Route::post('/trackings', [OrderTrackingController::class, 'store']);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin routes
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/orders', [OrderController::class, 'getAllOrders']);
+        Route::get('/carts', [CartController::class, 'getAllCarts']);
+        Route::get('/wishlists', [WishlistController::class, 'getAllWishlists']);
+        Route::get('/users', [UserController::class, 'getAllUsers']);
+        Route::get('/revenue', [OrderController::class, 'getTotalRevenue']);
+        Route::delete('/users/{id}', [UserController::class, 'destroyByAdmin']);
+        Route::get('/subscribers', [NewsletterController::class, 'index']);
+
+        Route::post('/disclaimers', [DisclaimerController::class, 'store']);
+        Route::put('/disclaimers/{id}', [DisclaimerController::class, 'update']);
+        Route::delete('/disclaimers/{id}', [DisclaimerController::class, 'destroy']);
+
+        Route::post('/kurirs', [KurirController::class, 'store']);
+        Route::put('/kurirs/{id}', [KurirController::class, 'update']);
+        Route::delete('/kurirs/{id}', [KurirController::class, 'destroy']);
+
+        Route::post('/promos', [PromoController::class, 'store']);
+        Route::put('/promos/{id}', [PromoController::class, 'update']);
+        Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
+
+        Route::post('/contact/{id}/reply', [ContactMessageController::class, 'reply']);
+
+        Route::get('/trackings', [OrderTrackingController::class, 'index']);
+        Route::put('/trackings/{order_id}', [OrderTrackingController::class, 'update']);
+        Route::delete('/trackings/{order_id}', [OrderTrackingController::class, 'destroy']);
+
+        // Quiz management (soal, jawaban, skor)
+        Route::get('/quiz/questions', [QuizAdminController::class, 'indexQuestions']);
+        Route::post('/quiz/questions', [QuizAdminController::class, 'storeQuestion']);
+        Route::get('/quiz/questions/{id}', [QuizAdminController::class, 'showQuestion']);
+        Route::put('/quiz/questions/{id}', [QuizAdminController::class, 'updateQuestion']);
+        Route::delete('/quiz/questions/{id}', [QuizAdminController::class, 'destroyQuestion']);
+
+        Route::post('/quiz/options', [QuizAdminController::class, 'storeOption']);
+        Route::put('/quiz/options/{id}', [QuizAdminController::class, 'updateOption']);
+        Route::delete('/quiz/options/{id}', [QuizAdminController::class, 'destroyOption']);
+
+        Route::get('/quiz/scores', [QuizAdminController::class, 'indexScores']);
+        Route::get('/quiz/scores/{id}', [QuizAdminController::class, 'showScore']);
+        Route::put('/quiz/scores/{id}', [QuizAdminController::class, 'updateScore']);
+        Route::delete('/quiz/scores/{id}', [QuizAdminController::class, 'destroyScore']);
+
+        // CMS
+        Route::get('/cms/faqs', [CmsController::class, 'adminFaqs']);
+        Route::post('/cms/faqs', [CmsController::class, 'storeFaq']);
+        Route::put('/cms/faqs/{id}', [CmsController::class, 'updateFaq']);
+        Route::delete('/cms/faqs/{id}', [CmsController::class, 'destroyFaq']);
+        Route::post('/cms/upload', [CmsController::class, 'upload']);
+        Route::get('/cms/{page}', [CmsController::class, 'adminShowPage']);
+        Route::put('/cms/{page}', [CmsController::class, 'adminUpdatePage']);
+    });
+
+    // Product write + order status + tracking update (admin)
+    Route::middleware('admin')->group(function () {
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::post('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+
+        Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+        Route::post('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
+        Route::get('/trackings', [OrderTrackingController::class, 'index']);
+        Route::put('/trackings/{order_id}', [OrderTrackingController::class, 'update']);
+        Route::delete('/trackings/{order_id}', [OrderTrackingController::class, 'destroy']);
+    });
 });
-

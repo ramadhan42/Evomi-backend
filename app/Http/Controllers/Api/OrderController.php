@@ -161,29 +161,44 @@ class OrderController extends Controller
 
     public function confirmReceipt($id, Request $request)
     {
-        $order = Order::where('user_id', $request->user()->id)->where('id', $id)->firstOrFail();
-        $order->update(['status' => 'selesai']);
+        $user = $request->user();
+        $order = Order::where('user_id', $user->id)->where('id', $id)->firstOrFail();
 
-        return response()->json(['message' => 'Pesanan telah dikonfirmasi diterima dan selesai.']);
+        // Konfirmasi seluruh batch checkout (grup by created_at yang sama)
+        $updated = Order::where('user_id', $user->id)
+            ->where('created_at', $order->created_at)
+            ->update(['status' => 'diterima']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pesanan telah dikonfirmasi diterima.',
+            'updated_count' => $updated,
+        ]);
     }
 
-    // Di dalam App\Http\Controllers\Api\OrderController
     public function destroy($id, Request $request)
     {
-        $order = Order::find($id); // Cari berdasarkan ID saja
+        $order = Order::find($id);
 
         if (!$order) {
             return response()->json(['message' => 'Riwayat pesanan tidak ditemukan'], 404);
         }
 
-        // Otorisasi: Admin (ID 1) atau Pemilik pesanan bisa hapus
-        if (auth()->id() !== 1 && $order->user_id !== auth()->id()) {
+        if (!auth()->user()?->is_admin && $order->user_id !== auth()->id()) {
             return response()->json(['message' => 'Anda tidak diizinkan menghapus pesanan ini.'], 403);
         }
 
-        $order->delete();
+        // Hapus seluruh batch yang sama (riwayat grup di frontend)
+        $query = Order::where('created_at', $order->created_at);
+        if (!auth()->user()?->is_admin) {
+            $query->where('user_id', auth()->id());
+        }
+        $deleted = $query->delete();
 
-        return response()->json(['message' => 'Riwayat pesanan berhasil dihapus'], 200);
+        return response()->json([
+            'message' => 'Riwayat pesanan berhasil dihapus',
+            'deleted_count' => $deleted,
+        ], 200);
     }
 
     /**
@@ -209,12 +224,11 @@ class OrderController extends Controller
             return response()->json(['message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        // 3. Otorisasi: Hanya user ID 1 atau pemilik pesanan yang bisa mengupdate
-        if (auth()->id() !== 1 && $order->user_id !== auth()->id()) {
+        // Admin middleware sudah membatasi akses; tetap jaga jika dipanggil tanpa middleware
+        if (!auth()->user()?->is_admin) {
             return response()->json(['message' => 'Anda tidak diizinkan memperbarui pesanan ini.'], 403);
         }
 
-        // 4. Update status
         $order->status = $request->status;
 
         if ($request->has('metode_pembayaran')) {

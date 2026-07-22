@@ -4,13 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
+use App\Support\LocaleResolver;
+use App\Support\ProductLocalizer;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
     public function index(Request $request)
     {
-        return response()->json($request->user()->carts()->with('product')->get());
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
+        $carts = $request->user()->carts()->with('product')->get();
+
+        return response()->json(ProductLocalizer::mapWithProduct($carts, $locale));
     }
 
     /**
@@ -95,7 +100,7 @@ class CartController extends Controller
         // Cek otorisasi:
         // User ID 1 adalah admin (bisa hapus semua)
         // User lain hanya bisa hapus jika cart milik mereka sendiri
-        if (auth()->id() !== 1 && $cartItem->user_id !== auth()->id()) {
+        if (!auth()->user()?->is_admin && $cartItem->user_id !== auth()->id()) {
             return response()->json(['message' => 'Anda tidak diizinkan menghapus item ini.'], 403);
         }
 

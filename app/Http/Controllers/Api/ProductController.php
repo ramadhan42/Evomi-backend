@@ -4,60 +4,107 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Support\LocaleResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    // READ: Ambil semua produk
-    public function index()
+    private const LOCALIZED_FIELDS = [
+        'title',
+        'description',
+        'personality_type',
+        'top_note',
+        'middle_note',
+        'base_note',
+        'perfume_type',
+        'gender',
+        'stock_status',
+        'kondisi',
+        'kategori',
+        'brand',
+        'etalase',
+    ];
+
+    private function localizeProduct(Product $product, string $locale): array
     {
-        $products = Product::orderBy('id', 'asc')->get();
-        return response()->json(['success' => true, 'data' => $products], 200);
+        return LocaleResolver::resolveFields(
+            $product->toArray(),
+            self::LOCALIZED_FIELDS,
+            $locale
+        );
     }
 
-    // READ: Ambil detail 1 produk
-    public function show($id)
+    public function index(Request $request)
     {
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
+        $products = Product::orderBy('id', 'asc')->get()
+            ->map(fn (Product $p) => $this->localizeProduct($p, $locale));
+
+        return response()->json([
+            'success' => true,
+            'data' => $products,
+            'locale' => $locale,
+        ], 200);
+    }
+
+    public function show(Request $request, $id)
+    {
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
         $product = Product::find($id);
 
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
-        return response()->json(['success' => true, 'data' => $product], 200);
+        return response()->json([
+            'success' => true,
+            'data' => $this->localizeProduct($product, $locale),
+            'locale' => $locale,
+        ], 200);
     }
 
-    // CREATE: Tambah produk baru
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
+            'title_en' => 'nullable|string|max:255',
             'description' => 'required|string',
+            'description_en' => 'nullable|string',
             'color' => 'nullable|string|max:50',
             'price' => 'required|numeric',
-            'personality_type' => 'nullable|in:prestige,peaceful_calm,rebel_brave,sweet_shy',
+            'personality_type' => 'nullable|in:prestige,purpose_prestige,peaceful_calm,rebel_brave,sweet_shy',
+            'personality_type_en' => 'nullable|string|max:255',
             'top_note' => 'nullable|string|max:255',
+            'top_note_en' => 'nullable|string|max:255',
             'middle_note' => 'nullable|string|max:255',
+            'middle_note_en' => 'nullable|string|max:255',
             'base_note' => 'nullable|string|max:255',
+            'base_note_en' => 'nullable|string|max:255',
             'image_1' => 'required|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_produk_belanja' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
+            'image_produk_belanja' => 'required|image|mimes:jpeg,png,jpg,webp|max:70048',
             'bottle_size' => 'required|integer',
             'perfume_type' => 'required|string|max:255',
+            'perfume_type_en' => 'nullable|string|max:255',
             'gender' => 'required|in:unisex,male,female',
+            'gender_en' => 'nullable|string|max:50',
             'quantity' => 'integer',
             'stock_status' => 'in:tersedia,minim,habis',
-            // Field produk baru
+            'stock_status_en' => 'nullable|string|max:50',
             'alamat_awal_pengiriman' => 'nullable|string|max:255',
             'kondisi' => 'nullable|string|max:100',
+            'kondisi_en' => 'nullable|string|max:100',
             'kategori' => 'nullable|string|max:100',
+            'kategori_en' => 'nullable|string|max:100',
             'berat_satuan' => 'nullable|numeric|min:0',
             'brand' => 'nullable|string|max:100',
+            'brand_en' => 'nullable|string|max:100',
             'etalase' => 'nullable|string|max:100',
+            'etalase_en' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -66,7 +113,10 @@ class ProductController extends Controller
 
         $data = $request->except(['image_1', 'image_2', 'image_3', 'image_4', 'image_produk_belanja']);
 
-        // Upload gambar ke storage/app/public/products
+        if (($data['personality_type'] ?? null) === 'purpose_prestige') {
+            $data['personality_type'] = 'prestige';
+        }
+
         $imageFields = ['image_1', 'image_2', 'image_3', 'image_4', 'image_produk_belanja'];
         foreach ($imageFields as $field) {
             if ($request->hasFile($field)) {
@@ -79,11 +129,10 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil ditambahkan',
-            'data' => $product
+            'data' => $product,
         ], 201);
     }
 
-    // UPDATE: Edit produk
     public function update(Request $request, $id)
     {
         $product = Product::find($id);
@@ -94,13 +143,19 @@ class ProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title' => 'sometimes|required|string|max:255',
+            'title_en' => 'nullable|string|max:255',
             'description' => 'sometimes|required|string',
+            'description_en' => 'nullable|string',
             'color' => 'nullable|string|max:50',
             'price' => 'sometimes|required|numeric',
-            'personality_type' => 'nullable|in:prestige,peaceful_calm,rebel_brave,sweet_shy',
+            'personality_type' => 'nullable|in:prestige,purpose_prestige,peaceful_calm,rebel_brave,sweet_shy',
+            'personality_type_en' => 'nullable|string|max:255',
             'top_note' => 'nullable|string|max:255',
+            'top_note_en' => 'nullable|string|max:255',
             'middle_note' => 'nullable|string|max:255',
+            'middle_note_en' => 'nullable|string|max:255',
             'base_note' => 'nullable|string|max:255',
+            'base_note_en' => 'nullable|string|max:255',
             'image_1' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
@@ -108,16 +163,22 @@ class ProductController extends Controller
             'image_produk_belanja' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
             'bottle_size' => 'sometimes|required|integer',
             'perfume_type' => 'sometimes|required|string|max:255',
+            'perfume_type_en' => 'nullable|string|max:255',
             'gender' => 'sometimes|required|in:unisex,male,female',
+            'gender_en' => 'nullable|string|max:50',
             'quantity' => 'integer',
             'stock_status' => 'in:tersedia,minim,habis',
-            // Field produk baru
+            'stock_status_en' => 'nullable|string|max:50',
             'alamat_awal_pengiriman' => 'nullable|string|max:255',
             'kondisi' => 'nullable|string|max:100',
+            'kondisi_en' => 'nullable|string|max:100',
             'kategori' => 'nullable|string|max:100',
+            'kategori_en' => 'nullable|string|max:100',
             'berat_satuan' => 'nullable|numeric|min:0',
             'brand' => 'nullable|string|max:100',
+            'brand_en' => 'nullable|string|max:100',
             'etalase' => 'nullable|string|max:100',
+            'etalase_en' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -126,14 +187,16 @@ class ProductController extends Controller
 
         $data = $request->except(['image_1', 'image_2', 'image_3', 'image_4', 'image_produk_belanja']);
 
+        if (($data['personality_type'] ?? null) === 'purpose_prestige') {
+            $data['personality_type'] = 'prestige';
+        }
+
         $imageFields = ['image_1', 'image_2', 'image_3', 'image_4', 'image_produk_belanja'];
         foreach ($imageFields as $field) {
             if ($request->hasFile($field)) {
-                // Hapus gambar lama
                 if ($product->$field) {
                     Storage::disk('public')->delete($product->$field);
                 }
-                // Simpan gambar baru
                 $data[$field] = $request->file($field)->store('products', 'public');
             }
         }
@@ -143,11 +206,10 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil diupdate',
-            'data' => $product
+            'data' => $product,
         ], 200);
     }
 
-    // DELETE: Hapus produk
     public function destroy($id)
     {
         $product = Product::find($id);
