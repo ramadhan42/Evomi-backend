@@ -3,10 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Mail\OrderPlacedMail;
 use App\Models\Cart;
 use App\Models\Order;
+use App\Models\OrderTracking;
+use App\Models\Product;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
@@ -42,7 +48,6 @@ class OrderController extends Controller
      */
     public function getAllOrders()
     {
-        // Memuat data produk dan user yang melakukan order
         $orders = Order::with(['product', 'user'])->latest()->get();
 
         return response()->json([
@@ -57,20 +62,11 @@ class OrderController extends Controller
      */
     public function getTotalRevenue()
     {
-        // 1. Hitung total harga produk asli dari semua order
         $totalProductPrice = Order::sum('total_price');
-
-        // 2. Hitung total item/quantity yang terjual dari semua order
         $totalQuantitySold = Order::sum('quantity');
-
-        // 3. Hitung total ongkir (Rp 1.000 per produk/quantity)
         $shippingCostPerItem = 1000;
         $totalShippingRevenue = $totalQuantitySold * $shippingCostPerItem;
-
-        // 4. Akumulasikan total pendapatan bersih + ongkir
         $totalRevenueWithShipping = $totalProductPrice + $totalShippingRevenue;
-
-        // 5. Hitung jumlah transaksi/invoice secara keseluruhan
         $totalOrdersCount = Order::count();
 
         return response()->json([
@@ -87,12 +83,13 @@ class OrderController extends Controller
         ], 200);
     }
 
+    /**
+     * Authenticated checkout (cart / logged-in buy-now).
+     */
     public function checkout(Request $request)
     {
-        // 1. Ambil user yang sudah diverifikasi oleh auth:sanctum
         $user = $request->user();
 
-        // 2. Validasi keamanan ganda (Jika token tidak valid / kedaluwarsa)
         if (!$user) {
             return response()->json([
                 'success' => false,
@@ -104,7 +101,6 @@ class OrderController extends Controller
         $invoiceId = $request->input('invoice_id');
         $metodePembayaran = $request->input('payment_method', 'Cash on Delivery');
 
-        // 3. Validasi kelengkapan data request
         if (empty($items) || !is_array($items)) {
             return response()->json([
                 'success' => false,
@@ -120,16 +116,18 @@ class OrderController extends Controller
         }
 
         $now = now();
+        $createdOrders = [];
+        $guestEmailFromRequest = $request->input('guest_email');
 
-        // 4. Proses Database dengan Transaction yang aman
         try {
-            DB::transaction(function () use ($user, $items, $invoiceId, $now, $metodePembayaran) {
+            DB::transaction(function () use ($user, $items, $invoiceId, $now, $metodePembayaran, $guestEmailFromRequest, &$createdOrders) {
                 foreach ($items as $index => $item) {
                     $orderId = count($items) > 1 ? "{$invoiceId}-" . ($index + 1) : $invoiceId;
 
-                    Order::create([
+                    $createdOrders[] = Order::create([
                         'id' => $orderId,
-                        'user_id' => $user->id, // Sekarang ini aman karena $user pasti ada
+                        'user_id' => $user->id,
+                        'guest_email' => $guestEmailFromRequest ?: $user->email,
                         'product_id' => $item['product_id'],
                         'quantity' => $item['quantity'],
                         'total_price' => $item['price'] * $item['quantity'],
@@ -140,22 +138,223 @@ class OrderController extends Controller
                     ]);
                 }
 
-                // Kosongkan keranjang user setelah checkout sukses
                 Cart::where('user_id', $user->id)->delete();
             });
 
+            $notifyEmail = $guestEmailFromRequest ?: $user->email;
+            if ($notifyEmail && count($createdOrders) > 0) {
+                $this->sendOrderPlacedMail(
+                    $createdOrders[0],
+                    $items,
+                    $metodePembayaran,
+                    (float) $request->input('total', $createdOrders[0]->total_price),
+                    [
+                        'name' => (string) $request->input('recipient_name', $user->name ?? 'Pelanggan'),
+                        'phone' => (string) $request->input('recipient_phone', ''),
+                        'address' => (string) $request->input('recipient_address', ''),
+                        'courier' => $request->input('courier'),
+                    ],
+                    $notifyEmail,
+                );
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Checkout berhasil!'
+                'message' => 'Checkout berhasil!',
+                'data' => [
+                    'order_id' => $invoiceId,
+                ],
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::error('Error Checkout:', ['detail' => $e->getMessage()]);
+            Log::error('Error Checkout:', ['detail' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses pembuatan pesanan',
-                'error_detail' => $e->getMessage() // Matikan ini jika sudah dipublish ke production
+                'error_detail' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Guest buy-now checkout (no auth). Max 1 item.
+     */
+    public function guestCheckout(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'guest_email' => 'required|email|max:255',
+            'invoice_id' => 'required|string|max:80',
+            'payment_method' => 'required|string|max:80',
+            'total' => 'nullable|numeric|min:0',
+            'items' => 'required|array|size:1',
+            'items.0.product_id' => 'required|integer|exists:products,id',
+            'items.0.quantity' => 'required|integer|min:1',
+            'items.0.price' => 'required|numeric|min:0',
+            'items.0.title' => 'nullable|string|max:255',
+            'recipient_name' => 'required|string|max:255',
+            'recipient_phone' => 'required|string|max:50',
+            'recipient_address' => 'required|string|max:1000',
+            'courier' => 'nullable|string|max:80',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+        $item = $data['items'][0];
+        $invoiceId = $data['invoice_id'];
+        $guestEmail = $data['guest_email'];
+        $metodePembayaran = $data['payment_method'];
+        $now = now();
+
+        try {
+            $order = null;
+
+            DB::transaction(function () use ($data, $item, $invoiceId, $guestEmail, $metodePembayaran, $now, &$order) {
+                $order = Order::create([
+                    'id' => $invoiceId,
+                    'user_id' => null,
+                    'guest_email' => $guestEmail,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'total_price' => $item['price'] * $item['quantity'],
+                    'status' => 'menunggu_konfirmasi',
+                    'metode_pembayaran' => $metodePembayaran,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                OrderTracking::create([
+                    'order_id' => $invoiceId,
+                    'status' => 'Menunggu Konfirmasi',
+                    'courier' => $data['courier'] ?? null,
+                    'recipient_name' => $data['recipient_name'],
+                    'recipient_phone' => $data['recipient_phone'],
+                    'recipient_address' => $data['recipient_address'],
+                    'timeline' => [
+                        [
+                            'status' => 'Pesanan dibuat',
+                            'date' => $now->toIso8601String(),
+                        ],
+                    ],
+                ]);
+            });
+
+            $product = Product::find($item['product_id']);
+            $mailItems = [[
+                'title' => $item['title'] ?? ($product?->title ?? 'Produk Evomi'),
+                'quantity' => $item['quantity'],
+                'price' => $item['price'],
+            ]];
+
+            $this->sendOrderPlacedMail(
+                $order,
+                $mailItems,
+                $metodePembayaran,
+                (float) ($data['total'] ?? $order->total_price),
+                [
+                    'name' => $data['recipient_name'],
+                    'phone' => $data['recipient_phone'],
+                    'address' => $data['recipient_address'],
+                    'courier' => $data['courier'] ?? null,
+                ],
+                $guestEmail,
+            );
+
+            $frontend = rtrim(
+                (string) (env('FRONTEND_URL') ?: env('APP_FRONTEND_URL') ?: env('APP_URL', 'http://localhost:3000')),
+                '/'
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checkout berhasil!',
+                'data' => [
+                    'order_id' => $invoiceId,
+                    'tracking_url_hint' => $frontend . '/pengiriman/' . $invoiceId,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error Guest Checkout:', ['detail' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses pembuatan pesanan',
+                'error_detail' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @param  list<array{product_id?: mixed, title?: string, quantity: mixed, price: mixed}>  $items
+     * @param  array{name: string, phone: string, address: string, courier?: string|null}  $recipient
+     */
+    private function sendOrderPlacedMail(
+        Order $order,
+        array $items,
+        string $paymentMethod,
+        float|int $total,
+        array $recipient,
+        string $email,
+    ): void {
+        try {
+            $mailItems = array_map(function ($item) {
+                $product = null;
+                if (!empty($item['product_id'])) {
+                    $product = Product::find($item['product_id']);
+                }
+
+                $title = $item['title'] ?? null;
+                if (!$title && $product) {
+                    $title = $product->title;
+                }
+
+                $imageUrl = null;
+                $imageLocalPath = null;
+                $imagePath = $product?->image_1 ?: $product?->image_produk_belanja;
+                if ($imagePath) {
+                    if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+                        $imageUrl = $imagePath;
+                    } else {
+                        $relative = ltrim($imagePath, '/');
+                        $local = storage_path('app/public/' . $relative);
+                        $imageUrl = rtrim((string) env('APP_URL', 'http://localhost:8000'), '/')
+                            . '/storage/'
+                            . $relative;
+
+                        if (is_file($local)) {
+                            $thumb = $this->makeEmailProductThumb($local, (int) ($product->id ?? 0));
+                            $imageLocalPath = $thumb ?: $local;
+                        }
+                    }
+                }
+
+                return [
+                    'title' => $title ?: 'Produk Evomi',
+                    'quantity' => (int) $item['quantity'],
+                    'price' => (float) $item['price'],
+                    'image_url' => $imageUrl,
+                    'image_path' => $imageLocalPath,
+                ];
+            }, $items);
+
+            Mail::to($email)->send(new OrderPlacedMail(
+                $order,
+                $recipient,
+                $mailItems,
+                $paymentMethod,
+                $total,
+            ));
+        } catch (\Throwable $e) {
+            Log::error('Order confirmation email failed', [
+                'order_id' => $order->id,
+                'email' => $email,
+                'detail' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -164,7 +363,6 @@ class OrderController extends Controller
         $user = $request->user();
         $order = Order::where('user_id', $user->id)->where('id', $id)->firstOrFail();
 
-        // Konfirmasi seluruh batch checkout (grup by created_at yang sama)
         $updated = Order::where('user_id', $user->id)
             ->where('created_at', $order->created_at)
             ->update(['status' => 'diterima']);
@@ -188,7 +386,6 @@ class OrderController extends Controller
             return response()->json(['message' => 'Anda tidak diizinkan menghapus pesanan ini.'], 403);
         }
 
-        // Hapus seluruh batch yang sama (riwayat grup di frontend)
         $query = Order::where('created_at', $order->created_at);
         if (!auth()->user()?->is_admin) {
             $query->where('user_id', auth()->id());
@@ -201,13 +398,8 @@ class OrderController extends Controller
         ], 200);
     }
 
-    /**
-     * Skenario Admin / Postman: Memperbarui status dan metode pembayaran pesanan secara spesifik
-     */
-    // Di dalam App\Http\Controllers\Api\OrderController
     public function updateStatus($id, Request $request)
     {
-        // 1. Validasi input
         $request->validate([
             'status' => [
                 'required',
@@ -217,14 +409,12 @@ class OrderController extends Controller
             'metode_pembayaran' => 'sometimes|string|nullable'
         ]);
 
-        // 2. Cari data
         $order = Order::find($id);
 
         if (!$order) {
             return response()->json(['message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        // Admin middleware sudah membatasi akses; tetap jaga jika dipanggil tanpa middleware
         if (!auth()->user()?->is_admin) {
             return response()->json(['message' => 'Anda tidak diizinkan memperbarui pesanan ini.'], 403);
         }
@@ -242,5 +432,60 @@ class OrderController extends Controller
             'message' => 'Data pesanan berhasil diperbarui.',
             'data' => $order
         ], 200);
+    }
+
+    /**
+     * Create a small JPEG thumbnail for embedding in order emails.
+     */
+    private function makeEmailProductThumb(string $sourcePath, int $productId): ?string
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            return null;
+        }
+
+        try {
+            $raw = @file_get_contents($sourcePath);
+            if ($raw === false) {
+                return null;
+            }
+            $src = @imagecreatefromstring($raw);
+            if (!$src) {
+                return null;
+            }
+
+            $sw = imagesx($src);
+            $sh = imagesy($src);
+            if ($sw < 1 || $sh < 1) {
+                imagedestroy($src);
+                return null;
+            }
+
+            $max = 200;
+            $scale = min($max / $sw, $max / $sh, 1);
+            $tw = max(1, (int) round($sw * $scale));
+            $th = max(1, (int) round($sh * $scale));
+
+            $dst = imagecreatetruecolor($tw, $th);
+            $white = imagecolorallocate($dst, 255, 255, 255);
+            imagefill($dst, 0, 0, $white);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
+
+            $dir = storage_path('app/email-thumbs');
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            $out = $dir . '/product-' . ($productId ?: md5($sourcePath)) . '.jpg';
+            imagejpeg($dst, $out, 78);
+            imagedestroy($src);
+            imagedestroy($dst);
+
+            return is_file($out) ? $out : null;
+        } catch (\Throwable $e) {
+            Log::warning('Failed creating email product thumb', [
+                'path' => $sourcePath,
+                'detail' => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 }

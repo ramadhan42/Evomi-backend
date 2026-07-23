@@ -31,8 +31,10 @@ class LocaleSeeder extends Seeder
     {
         // Navbar
         $this->put('navbar', 'site', 'browser_title', 'string', 'Evomi Website', 'id');
+        $this->put('navbar', 'site', 'dashboard_browser_title', 'string', 'Evomi Dashboard', 'id');
         $this->put('navbar', 'site', 'favicon', 'image', '/favicon.ico', 'id');
         $this->put('navbar', 'site', 'browser_title', 'string', 'Evomi Website');
+        $this->put('navbar', 'site', 'dashboard_browser_title', 'string', 'Evomi Dashboard');
         $this->put('navbar', 'site', 'favicon', 'image', '/favicon.ico');
         foreach ([
             'beranda' => 'Home',
@@ -82,7 +84,19 @@ class LocaleSeeder extends Seeder
         $this->put('beranda', 'hero', 'product3_badge_label', 'string', 'Peaceful Calm');
         $this->put('beranda', 'hero', 'product4_badge_label', 'string', 'Sweet Shy');
 
-        $this->put('beranda', 'second', 'headline_1', 'string', 'Meet our ');
+        // Hero wave SVG positions (id + en — style, same defaults)
+        foreach (['id', 'en'] as $loc) {
+            $this->put('beranda', 'hero', 'wave_left_left_mobile', 'string', '-24%', $loc);
+            $this->put('beranda', 'hero', 'wave_left_left_desktop', 'string', '-11%', $loc);
+            $this->put('beranda', 'hero', 'wave_left_top_mobile', 'string', '-44%', $loc);
+            $this->put('beranda', 'hero', 'wave_left_top_desktop', 'string', '-35%', $loc);
+            $this->put('beranda', 'hero', 'wave_right_right_mobile', 'string', '-17%', $loc);
+            $this->put('beranda', 'hero', 'wave_right_right_desktop', 'string', '-11%', $loc);
+            $this->put('beranda', 'hero', 'wave_right_top_mobile', 'string', '-74%', $loc);
+            $this->put('beranda', 'hero', 'wave_right_top_desktop', 'string', '-50%', $loc);
+        }
+
+        $this->put('beranda', 'second', 'headline_1', 'string', 'Meet our');
         $this->put('beranda', 'second', 'headline_2', 'string', 'characters ');
         $this->put('beranda', 'second', 'headline_3', 'string', 'today!');
         $this->put('beranda', 'second', 'cta_label', 'string', 'See All Characters');
@@ -103,6 +117,65 @@ class LocaleSeeder extends Seeder
         $this->put('beranda', 'seventh', 'en_l3', 'string', 'playing the ');
         $this->put('beranda', 'seventh', 'en_l4', 'string', 'quiz');
         $this->put('beranda', 'seventh', 'cta_label', 'string', 'Start Quiz');
+        $this->put('beranda', 'seventh', 'label1_text', 'string', 'Prestige');
+        $this->put('beranda', 'seventh', 'label1_title', 'string', 'Purpose Prestige');
+        $this->put('beranda', 'seventh', 'label2_text', 'string', 'Calm');
+        $this->put('beranda', 'seventh', 'label2_title', 'string', 'Peaceful Calm');
+        $this->put('beranda', 'seventh', 'label3_text', 'string', 'Rebel');
+        $this->put('beranda', 'seventh', 'label3_title', 'string', 'Rebel Brave');
+        $this->put('beranda', 'seventh', 'label4_text', 'string', 'Sweet');
+        $this->put('beranda', 'seventh', 'label4_title', 'string', 'Sweet Shy');
+
+        // Section 7 label layout/style (shared id+en)
+        foreach ([
+            ['label1_color', '#5CB2ED'],
+            ['label1_fs_mobile', '9px'],
+            ['label1_fs_desktop', '16px'],
+            ['label1_left_mobile', '61%'],
+            ['label1_left_desktop', '61%'],
+            ['label1_right_mobile', ''],
+            ['label1_right_desktop', ''],
+            ['label1_top_mobile', '33%'],
+            ['label1_top_desktop', '33%'],
+            ['label1_bottom_mobile', ''],
+            ['label1_bottom_desktop', ''],
+            ['label2_color', '#5EA14A'],
+            ['label2_fs_mobile', '9px'],
+            ['label2_fs_desktop', '16px'],
+            ['label2_left_mobile', '82%'],
+            ['label2_left_desktop', '82%'],
+            ['label2_right_mobile', ''],
+            ['label2_right_desktop', ''],
+            ['label2_top_mobile', '15%'],
+            ['label2_top_desktop', '15%'],
+            ['label2_bottom_mobile', ''],
+            ['label2_bottom_desktop', ''],
+            ['label3_color', '#E33D35'],
+            ['label3_fs_mobile', '9px'],
+            ['label3_fs_desktop', '16px'],
+            ['label3_left_mobile', '26%'],
+            ['label3_left_desktop', '26%'],
+            ['label3_right_mobile', ''],
+            ['label3_right_desktop', ''],
+            ['label3_top_mobile', '15%'],
+            ['label3_top_desktop', '15%'],
+            ['label3_bottom_mobile', ''],
+            ['label3_bottom_desktop', ''],
+            ['label4_color', '#DD74A5'],
+            ['label4_fs_mobile', '9px'],
+            ['label4_fs_desktop', '16px'],
+            ['label4_left_mobile', '47.5%'],
+            ['label4_left_desktop', '47.5%'],
+            ['label4_right_mobile', ''],
+            ['label4_right_desktop', ''],
+            ['label4_top_mobile', '-3%'],
+            ['label4_top_desktop', '-3%'],
+            ['label4_bottom_mobile', ''],
+            ['label4_bottom_desktop', ''],
+        ] as [$key, $value]) {
+            $this->put('beranda', 'seventh', $key, 'string', $value, 'id');
+            $this->put('beranda', 'seventh', $key, 'string', $value, 'en');
+        }
 
         $this->put('beranda', 'third', 'card1_desc', 'text', 'Every scent is designed to represent different versions of self, emotion, and character — so perfume becomes personal expression, not just fragrance.');
         $this->put('beranda', 'third', 'card2_desc', 'text', 'We care for the environment by recycling plastic bottle caps into part of the product identity — a small step toward less waste and more sustainability.');

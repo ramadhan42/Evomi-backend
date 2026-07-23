@@ -7,7 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     // Tambahkan metode_pembayaran di sini
-    protected $fillable = ['id', 'user_id', 'product_id', 'quantity', 'total_price', 'status', 'metode_pembayaran'];
+    protected $fillable = [
+        'id',
+        'user_id',
+        'guest_email',
+        'product_id',
+        'quantity',
+        'total_price',
+        'status',
+        'metode_pembayaran',
+    ];
 
     public $incrementing = false;      // Matikan auto-increment
     protected $keyType = 'string';

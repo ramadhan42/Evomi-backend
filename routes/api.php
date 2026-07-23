@@ -46,6 +46,8 @@ Route::post('/contact/mark-read', [ContactMessageController::class, 'markUserRea
 // Tracking: public read (lacak paket), write di auth
 Route::get('/trackings/{order_id}', [OrderTrackingController::class, 'show']);
 
+Route::post('/checkout/guest', [OrderController::class, 'guestCheckout']);
+
 Route::get('/disclaimers', [DisclaimerController::class, 'index']);
 Route::get('/disclaimers/{id}', [DisclaimerController::class, 'show']);
 Route::get('/kurirs', [KurirController::class, 'index']);
@@ -82,6 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quiz/history', [QuizController::class, 'history']);
 
     Route::get('/shopping-history', [UserController::class, 'shoppingHistory']);
+    Route::get('/badges', [UserController::class, 'badges']);
 
     Route::post('/checkout', [OrderController::class, 'checkout']);
     Route::patch('/orders/{id}/confirm', [OrderController::class, 'confirmReceipt']);
