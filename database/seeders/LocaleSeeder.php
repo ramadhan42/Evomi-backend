@@ -84,6 +84,35 @@ class LocaleSeeder extends Seeder
         $this->put('beranda', 'hero', 'product3_badge_label', 'string', 'Peaceful Calm');
         $this->put('beranda', 'hero', 'product4_badge_label', 'string', 'Sweet Shy');
 
+        // Hero typography (id + en — style, same defaults)
+        foreach (['id', 'en'] as $loc) {
+            foreach ([
+                ['headline_1_font_family', 'nohemi'],
+                ['headline_1_font_weight', '600'],
+                ['headline_1_font_style', 'normal'],
+                ['headline_2_font_family', 'nohemi'],
+                ['headline_2_font_weight', '600'],
+                ['headline_2_font_style', 'normal'],
+                ['headline_3_font_family', 'nohemi'],
+                ['headline_3_font_weight', '600'],
+                ['headline_3_font_style', 'normal'],
+                ['headline_4_font_family', 'nohemi'],
+                ['headline_4_font_weight', '600'],
+                ['headline_4_font_style', 'normal'],
+                ['badge_left_font_family', 'nohemi'],
+                ['badge_left_font_weight', '700'],
+                ['badge_left_font_style', 'normal'],
+                ['badge_right_font_family', 'nohemi'],
+                ['badge_right_font_weight', '700'],
+                ['badge_right_font_style', 'normal'],
+                ['marquee_font_family', 'nohemi'],
+                ['marquee_font_weight', '500'],
+                ['marquee_font_style', 'normal'],
+            ] as [$key, $value]) {
+                $this->put('beranda', 'hero', $key, 'string', $value, $loc);
+            }
+        }
+
         // Hero wave SVG positions (id + en — style, same defaults)
         foreach (['id', 'en'] as $loc) {
             $this->put('beranda', 'hero', 'wave_left_left_mobile', 'string', '-24%', $loc);
