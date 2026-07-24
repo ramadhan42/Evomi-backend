@@ -9,14 +9,25 @@ use Illuminate\Support\Facades\Validator;
 
 class KurirController extends Controller
 {
-    // READ: Ambil semua kurir
-    public function index()
+    /**
+     * Public & admin: daftar kurir.
+     * Query ?all=1 (admin) → termasuk nonaktif.
+     */
+    public function index(Request $request)
     {
-        $kurirs = Kurir::orderBy('id', 'asc')->get();
-        return response()->json(['success' => true, 'data' => $kurirs], 200);
+        $query = Kurir::query()->orderBy('nama')->orderBy('jenis');
+
+        $includeInactive = $request->boolean('all') && $request->user()?->is_admin;
+        if (!$includeInactive) {
+            $query->active();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $query->get(),
+        ], 200);
     }
 
-    // READ: Ambil detail 1 kurir
     public function show($id)
     {
         $kurir = Kurir::find($id);
@@ -28,7 +39,6 @@ class KurirController extends Controller
         return response()->json(['success' => true, 'data' => $kurir], 200);
     }
 
-    // CREATE: Tambah kurir baru
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -36,13 +46,23 @@ class KurirController extends Controller
             'jenis' => 'required|string|max:100',
             'harga' => 'required|numeric|min:0',
             'destinasi' => 'required|string|max:255',
+            'estimasi_hari' => 'nullable|integer|min:1|max:30',
+            'is_active' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $kurir = Kurir::create($request->only(['nama', 'jenis', 'harga', 'destinasi']));
+        $payload = $request->only(['nama', 'jenis', 'harga', 'destinasi', 'estimasi_hari', 'is_active']);
+        if (!isset($payload['estimasi_hari'])) {
+            $payload['estimasi_hari'] = 3;
+        }
+        if (!isset($payload['is_active'])) {
+            $payload['is_active'] = true;
+        }
+
+        $kurir = Kurir::create($payload);
 
         return response()->json([
             'success' => true,
@@ -51,7 +71,6 @@ class KurirController extends Controller
         ], 201);
     }
 
-    // UPDATE: Edit kurir
     public function update(Request $request, $id)
     {
         $kurir = Kurir::find($id);
@@ -65,22 +84,30 @@ class KurirController extends Controller
             'jenis' => 'sometimes|required|string|max:100',
             'harga' => 'sometimes|required|numeric|min:0',
             'destinasi' => 'sometimes|required|string|max:255',
+            'estimasi_hari' => 'nullable|integer|min:1|max:30',
+            'is_active' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $kurir->update($request->only(['nama', 'jenis', 'harga', 'destinasi']));
+        $kurir->update($request->only([
+            'nama',
+            'jenis',
+            'harga',
+            'destinasi',
+            'estimasi_hari',
+            'is_active',
+        ]));
 
         return response()->json([
             'success' => true,
             'message' => 'Kurir berhasil diupdate',
-            'data' => $kurir,
+            'data' => $kurir->fresh(),
         ], 200);
     }
 
-    // DELETE: Hapus kurir
     public function destroy($id)
     {
         $kurir = Kurir::find($id);

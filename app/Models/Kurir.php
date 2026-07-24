@@ -14,5 +14,18 @@ class Kurir extends Model
         'jenis',
         'harga',
         'destinasi',
+        'estimasi_hari',
+        'is_active',
     ];
+
+    protected $casts = [
+        'harga' => 'float',
+        'estimasi_hari' => 'integer',
+        'is_active' => 'boolean',
+    ];
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 }

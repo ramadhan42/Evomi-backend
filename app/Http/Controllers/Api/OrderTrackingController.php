@@ -58,41 +58,61 @@ class OrderTrackingController extends Controller
     }
 
     /**
-     * 3. READ (Detail): Mengambil detail pelacakan berdasarkan Order ID
+     * 3. READ (Detail): Ambil detail pelacakan berdasarkan nomor resi
      */
-    public function show($orderId)
+    public function show($resi)
     {
-        // Exact match, atau base invoice (INV-123 dari INV-123-1)
-        $tracking = OrderTracking::where('order_id', $orderId)->first();
+        $resi = trim(urldecode((string) $resi));
 
-        if (!$tracking && preg_match('/^(.+)-\d+$/', $orderId, $matches)) {
-            $tracking = OrderTracking::where('order_id', $matches[1])->first();
+        if ($resi === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nomor resi wajib diisi untuk melacak pesanan.',
+            ], 422);
         }
+
+        $tracking = OrderTracking::whereNotNull('tracking_number')
+            ->where('tracking_number', '!=', '')
+            ->where('tracking_number', $resi)
+            ->first();
 
         if (!$tracking) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pesanan tidak ditemukan atau resi belum tersedia.'
+                'message' => 'Nomor resi tidak ditemukan. Pastikan resi sudah diinput admin, atau coba lagi nanti.',
             ], 404);
         }
 
-        // Format data yang disesuaikan dengan kebutuhan Next.js (LacakPaketPage)
+        $timeline = collect($tracking->timeline ?? [])->map(function ($item) {
+            $rawTime = $item['time'] ?? $item['date'] ?? null;
+
+            return [
+                'status' => $item['status'] ?? '',
+                'time' => $rawTime,
+                'description' => $item['description'] ?? null,
+            ];
+        })->values()->all();
+
         return response()->json([
             'success' => true,
             'data' => [
                 'orderId' => $tracking->order_id,
                 'resi' => $tracking->tracking_number,
-                'courier' => $tracking->courier,
+                'courier' => $tracking->courier ?: 'Belum ditentukan',
                 'estimatedDelivery' => $tracking->estimated_delivery
                     ? $tracking->estimated_delivery->translatedFormat('d F Y')
                     : 'Belum ada estimasi',
-                'currentStatus' => $tracking->status,
+                'estimatedDeliveryRaw' => $tracking->estimated_delivery
+                    ? $tracking->estimated_delivery->toDateString()
+                    : null,
+                'currentStatus' => $tracking->status ?: 'Menunggu pengiriman',
+                'hasShipped' => !empty($tracking->tracking_number),
                 'recipient' => [
                     'name' => $tracking->recipient_name,
                     'phone' => $tracking->recipient_phone,
                     'address' => $tracking->recipient_address,
                 ],
-                'timeline' => $tracking->timeline ?? [],
+                'timeline' => $timeline,
             ]
         ], 200);
     }

@@ -44,7 +44,7 @@ Route::get('/contact/unread-count', [ContactMessageController::class, 'getUnread
 Route::post('/contact/mark-read', [ContactMessageController::class, 'markUserRead']);
 
 // Tracking: public read (lacak paket), write di auth
-Route::get('/trackings/{order_id}', [OrderTrackingController::class, 'show']);
+Route::get('/trackings/{resi}', [OrderTrackingController::class, 'show']);
 
 Route::post('/checkout/guest', [OrderController::class, 'guestCheckout']);
 
@@ -114,6 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/disclaimers/{id}', [DisclaimerController::class, 'update']);
         Route::delete('/disclaimers/{id}', [DisclaimerController::class, 'destroy']);
 
+        Route::get('/kurirs', [KurirController::class, 'index']);
         Route::post('/kurirs', [KurirController::class, 'store']);
         Route::put('/kurirs/{id}', [KurirController::class, 'update']);
         Route::delete('/kurirs/{id}', [KurirController::class, 'destroy']);

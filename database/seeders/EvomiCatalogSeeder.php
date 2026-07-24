@@ -26,19 +26,145 @@ class EvomiCatalogSeeder extends Seeder
 
         // Produk dikelola ProductSeeder (gambar + urutan lengkap)
 
-        if (!Kurir::exists()) {
-            Kurir::create([
+        $kurirSeeds = [
+            [
                 'nama' => 'JNE Reguler',
                 'jenis' => 'REG',
                 'harga' => 20000,
                 'destinasi' => 'Seluruh Indonesia',
-            ]);
-            Kurir::create([
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'JNE YES',
+                'jenis' => 'YES',
+                'harga' => 35000,
+                'destinasi' => 'Kota besar Indonesia',
+                'estimasi_hari' => 1,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'JNE OKE',
+                'jenis' => 'OKE',
+                'harga' => 16000,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 4,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'J&T Express',
+                'jenis' => 'EZ',
+                'harga' => 18000,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'J&T Cargo',
+                'jenis' => 'Economy',
+                'harga' => 14000,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 5,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'SiCepat REG',
+                'jenis' => 'REG',
+                'harga' => 17000,
+                'destinasi' => 'Jabodetabek & Jawa',
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
                 'nama' => 'SiCepat Halu',
                 'jenis' => 'HALU',
-                'harga' => 18000,
+                'harga' => 22000,
+                'destinasi' => 'Jabodetabek & kota besar',
+                'estimasi_hari' => 1,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'SiCepat GOKIL',
+                'jenis' => 'GOKIL',
+                'harga' => 28000,
+                'destinasi' => 'Jabodetabek',
+                'estimasi_hari' => 1,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'TIKI Reguler',
+                'jenis' => 'REG',
+                'harga' => 19000,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'TIKI Overnight',
+                'jenis' => 'ONS',
+                'harga' => 40000,
+                'destinasi' => 'Kota besar Indonesia',
+                'estimasi_hari' => 1,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'Anteraja Reguler',
+                'jenis' => 'REG',
+                'harga' => 15000,
                 'destinasi' => 'Jabodetabek & Jawa',
-            ]);
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'Anteraja Same Day',
+                'jenis' => 'Same Day',
+                'harga' => 25000,
+                'destinasi' => 'Jabodetabek',
+                'estimasi_hari' => 1,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'Ninja Xpress',
+                'jenis' => 'Standard',
+                'harga' => 16500,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'Pos Indonesia',
+                'jenis' => 'Kilat Khusus',
+                'harga' => 18000,
+                'destinasi' => 'Seluruh Indonesia',
+                'estimasi_hari' => 4,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'ID Express',
+                'jenis' => 'REG',
+                'harga' => 15500,
+                'destinasi' => 'Jawa & Sumatera',
+                'estimasi_hari' => 3,
+                'is_active' => true,
+            ],
+            [
+                'nama' => 'Shopee Express',
+                'jenis' => 'Standard',
+                'harga' => 12000,
+                'destinasi' => 'Jabodetabek & kota besar',
+                'estimasi_hari' => 2,
+                'is_active' => true,
+            ],
+        ];
+
+        foreach ($kurirSeeds as $seed) {
+            Kurir::updateOrCreate(
+                [
+                    'nama' => $seed['nama'],
+                    'jenis' => $seed['jenis'],
+                ],
+                $seed,
+            );
         }
 
         if (!Promo::exists()) {
