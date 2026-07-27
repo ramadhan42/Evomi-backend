@@ -125,11 +125,15 @@ class ProductController extends Controller
         }
 
         $product = Product::create($data);
+        if (array_key_exists('quantity', $data) && !array_key_exists('stock_status', $data)) {
+            $product->applyStockStatusFromQuantity();
+            $product->save();
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil ditambahkan',
-            'data' => $product,
+            'data' => $product->fresh(),
         ], 201);
     }
 
@@ -203,10 +207,16 @@ class ProductController extends Controller
 
         $product->update($data);
 
+        // Jika admin hanya mengubah angka stok tanpa status, sync label otomatis
+        if (array_key_exists('quantity', $data) && !array_key_exists('stock_status', $data)) {
+            $product->applyStockStatusFromQuantity();
+            $product->save();
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Produk berhasil diupdate',
-            'data' => $product,
+            'data' => $product->fresh(),
         ], 200);
     }
 

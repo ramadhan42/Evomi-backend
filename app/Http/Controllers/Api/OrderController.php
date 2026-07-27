@@ -62,24 +62,25 @@ class OrderController extends Controller
      */
     public function getTotalRevenue()
     {
-        $totalProductPrice = Order::sum('total_price');
-        $totalQuantitySold = Order::sum('quantity');
-        $shippingCostPerItem = 1000;
-        $totalShippingRevenue = $totalQuantitySold * $shippingCostPerItem;
-        $totalRevenueWithShipping = $totalProductPrice + $totalShippingRevenue;
+        $totalProductPrice = (float) Order::sum('total_price');
+        $totalShippingRevenue = (float) Order::sum('shipping_cost');
+        $totalPromoDiscount = (float) Order::sum('promo_discount');
+        $totalQuantitySold = (int) Order::sum('quantity');
         $totalOrdersCount = Order::count();
+        $totalRevenue = max(0, $totalProductPrice + $totalShippingRevenue - $totalPromoDiscount);
 
         return response()->json([
             'success' => true,
-            'message' => 'Data ringkasan pendapatan admin (termasuk ongkir) berhasil dimuat.',
+            'message' => 'Data ringkasan pendapatan admin (produk + ongkir − promo) berhasil dimuat.',
             'data' => [
-                'total_revenue' => (int) $totalRevenueWithShipping,
-                'total_revenue_clean' => (int) $totalProductPrice,
+                'total_revenue' => (int) $totalRevenue,
+                'total_revenue_clean' => (int) max(0, $totalProductPrice - $totalPromoDiscount),
                 'total_orders_count' => $totalOrdersCount,
-                'total_items_sold' => (int) $totalQuantitySold,
+                'total_items_sold' => $totalQuantitySold,
                 'total_shipping_cost' => (int) $totalShippingRevenue,
-                'currency' => 'IDR'
-            ]
+                'total_promo_discount' => (int) $totalPromoDiscount,
+                'currency' => 'IDR',
+            ],
         ], 200);
     }
 
@@ -118,19 +119,47 @@ class OrderController extends Controller
         $now = now();
         $createdOrders = [];
         $guestEmailFromRequest = $request->input('guest_email');
+        $shippingCost = max(0, (float) $request->input('shipping_cost', 0));
+        $promoDiscount = max(0, (float) $request->input('promo_discount', 0));
 
         try {
-            DB::transaction(function () use ($user, $items, $invoiceId, $now, $metodePembayaran, $guestEmailFromRequest, &$createdOrders) {
+            DB::transaction(function () use (
+                $user,
+                $items,
+                $invoiceId,
+                $now,
+                $metodePembayaran,
+                $guestEmailFromRequest,
+                $shippingCost,
+                $promoDiscount,
+                &$createdOrders
+            ) {
                 foreach ($items as $index => $item) {
                     $orderId = count($items) > 1 ? "{$invoiceId}-" . ($index + 1) : $invoiceId;
+                    $productId = (int) ($item['product_id'] ?? 0);
+                    $qty = (int) ($item['quantity'] ?? 0);
 
+                    if ($productId <= 0 || $qty <= 0) {
+                        throw new \RuntimeException('Item pesanan tidak valid.');
+                    }
+
+                    $product = Product::where('id', $productId)->lockForUpdate()->first();
+                    if (!$product) {
+                        throw new \RuntimeException("Produk #{$productId} tidak ditemukan.");
+                    }
+                    $product->decrementStock($qty);
+
+                    // total_price = harga katalog × qty (sebelum promo)
+                    // shipping + promo disimpan di baris pertama agar tidak dobel
                     $createdOrders[] = Order::create([
                         'id' => $orderId,
                         'user_id' => $user->id,
                         'guest_email' => $guestEmailFromRequest ?: $user->email,
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
-                        'total_price' => $item['price'] * $item['quantity'],
+                        'product_id' => $productId,
+                        'quantity' => $qty,
+                        'total_price' => $item['price'] * $qty,
+                        'shipping_cost' => $index === 0 ? $shippingCost : 0,
+                        'promo_discount' => $index === 0 ? $promoDiscount : 0,
                         'status' => 'menunggu_konfirmasi',
                         'metode_pembayaran' => $metodePembayaran,
                         'created_at' => $now,
@@ -166,6 +195,12 @@ class OrderController extends Controller
                 ],
             ], 200);
 
+        } catch (\RuntimeException $e) {
+            Log::warning('Checkout stock/validation:', ['detail' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Error Checkout:', ['detail' => $e->getMessage()]);
             return response()->json([
@@ -186,6 +221,8 @@ class OrderController extends Controller
             'invoice_id' => 'required|string|max:80',
             'payment_method' => 'required|string|max:80',
             'total' => 'nullable|numeric|min:0',
+            'shipping_cost' => 'nullable|numeric|min:0',
+            'promo_discount' => 'nullable|numeric|min:0',
             'items' => 'required|array|size:1',
             'items.0.product_id' => 'required|integer|exists:products,id',
             'items.0.quantity' => 'required|integer|min:1',
@@ -210,19 +247,42 @@ class OrderController extends Controller
         $invoiceId = $data['invoice_id'];
         $guestEmail = $data['guest_email'];
         $metodePembayaran = $data['payment_method'];
+        $shippingCost = max(0, (float) ($data['shipping_cost'] ?? 0));
+        $promoDiscount = max(0, (float) ($data['promo_discount'] ?? 0));
         $now = now();
 
         try {
             $order = null;
 
-            DB::transaction(function () use ($data, $item, $invoiceId, $guestEmail, $metodePembayaran, $now, &$order) {
+            DB::transaction(function () use (
+                $data,
+                $item,
+                $invoiceId,
+                $guestEmail,
+                $metodePembayaran,
+                $shippingCost,
+                $promoDiscount,
+                $now,
+                &$order
+            ) {
+                $productId = (int) $item['product_id'];
+                $qty = (int) $item['quantity'];
+
+                $product = Product::where('id', $productId)->lockForUpdate()->first();
+                if (!$product) {
+                    throw new \RuntimeException("Produk #{$productId} tidak ditemukan.");
+                }
+                $product->decrementStock($qty);
+
                 $order = Order::create([
                     'id' => $invoiceId,
                     'user_id' => null,
                     'guest_email' => $guestEmail,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'total_price' => $item['price'] * $item['quantity'],
+                    'product_id' => $productId,
+                    'quantity' => $qty,
+                    'total_price' => $item['price'] * $qty,
+                    'shipping_cost' => $shippingCost,
+                    'promo_discount' => $promoDiscount,
                     'status' => 'menunggu_konfirmasi',
                     'metode_pembayaran' => $metodePembayaran,
                     'created_at' => $now,
@@ -279,6 +339,12 @@ class OrderController extends Controller
                     'tracking_url_hint' => $frontend . '/pengiriman/' . $invoiceId,
                 ],
             ], 200);
+        } catch (\RuntimeException $e) {
+            Log::warning('Guest checkout stock/validation:', ['detail' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Error Guest Checkout:', ['detail' => $e->getMessage()]);
             return response()->json([

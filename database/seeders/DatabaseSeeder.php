@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             QuizSeeder::class,
             CmsSeeder::class,
             LocaleSeeder::class,
+            ShopCmsSeeder::class,
         ]);
     }
 }

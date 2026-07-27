@@ -119,11 +119,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/kurirs/{id}', [KurirController::class, 'update']);
         Route::delete('/kurirs/{id}', [KurirController::class, 'destroy']);
 
+        Route::get('/promos', [PromoController::class, 'index']);
         Route::post('/promos', [PromoController::class, 'store']);
         Route::put('/promos/{id}', [PromoController::class, 'update']);
         Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
 
         Route::post('/contact/{id}/reply', [ContactMessageController::class, 'reply']);
+        Route::get('/contact/conversations', [ContactMessageController::class, 'conversations']);
+        Route::get('/contact/thread', [ContactMessageController::class, 'thread']);
+        Route::post('/contact/thread/send', [ContactMessageController::class, 'sendToUser']);
+        Route::delete('/contact/thread', [ContactMessageController::class, 'destroyConversation']);
 
         Route::get('/trackings', [OrderTrackingController::class, 'index']);
         Route::put('/trackings/{order_id}', [OrderTrackingController::class, 'update']);

@@ -3,6 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContactReply;
+use App\Models\Order;
+use App\Models\User;
+use App\Support\LocaleResolver;
+use App\Support\ProductLocalizer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -16,7 +21,7 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data profil berhasil diambil.',
-            'data' => $request->user()
+            'data' => $request->user(),
         ], 200);
     }
 
@@ -26,12 +31,12 @@ class UserController extends Controller
     public function getAllUsers()
     {
         // Mengambil semua user kecuali data yang sensitif (password, token, dll otomatis tersembunyi)
-        $users = \App\Models\User::latest()->get();
+        $users = User::latest()->get();
 
         return response()->json([
             'success' => true,
             'message' => 'Semua data user berhasil diambil.',
-            'data' => $users
+            'data' => $users,
         ], 200);
     }
 
@@ -49,6 +54,7 @@ class UserController extends Controller
             'alamat_lengkap' => ['nullable', 'string'],
             'phone' => ['nullable', 'string', 'max:20'], // Tambahkan validasi phone
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'password' => ['nullable', 'string', 'min:8'],
             'avatar_profile' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'], // Validasi gambar
         ]);
 
@@ -58,12 +64,18 @@ class UserController extends Controller
             $validated['avatar_profile'] = $path;
         }
 
+        if (! empty($validated['password'])) {
+            $validated['password'] = bcrypt($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
         $user->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Profil berhasil diperbarui.',
-            'data' => $user
+            'data' => $user,
         ], 200);
     }
 
@@ -84,7 +96,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Akun Anda telah berhasil dihapus secara permanen.'
+            'message' => 'Akun Anda telah berhasil dihapus secara permanen.',
         ], 200);
     }
 
@@ -93,12 +105,12 @@ class UserController extends Controller
      */
     public function destroyByAdmin($id)
     {
-        $user = \App\Models\User::find($id);
+        $user = User::find($id);
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'User tidak ditemukan.'
+                'message' => 'User tidak ditemukan.',
             ], 404);
         }
 
@@ -106,14 +118,14 @@ class UserController extends Controller
         if ($user->is_admin) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akun admin tidak dapat dihapus.'
+                'message' => 'Akun admin tidak dapat dihapus.',
             ], 403);
         }
 
         if (auth()->check() && auth()->id() === $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak bisa menghapus akun Anda sendiri dari halaman ini.'
+                'message' => 'Anda tidak bisa menghapus akun Anda sendiri dari halaman ini.',
             ], 403);
         }
 
@@ -127,7 +139,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'User berhasil dihapus oleh Admin.'
+            'message' => 'User berhasil dihapus oleh Admin.',
         ], 200);
     }
 
@@ -137,15 +149,43 @@ class UserController extends Controller
     public function shoppingHistory(Request $request)
     {
         $user = $request->user();
-        $locale = \App\Support\LocaleResolver::normalize($request->query('locale', 'id'));
+        $locale = LocaleResolver::normalize($request->query('locale', 'id'));
 
-        $history = \App\Models\Order::with('product')
+        $history = Order::with('product')
             ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json(
-            \App\Support\ProductLocalizer::mapWithProduct($history, $locale)
+            ProductLocalizer::mapWithProduct($history, $locale)
         );
+    }
+
+    /**
+     * Lightweight badge counts for navbar / profile menu.
+     */
+    public function badges(Request $request)
+    {
+        $user = $request->user();
+
+        $unread = ContactReply::query()
+            ->where(function ($q) {
+                $q->where('is_read_by_user', false)
+                    ->orWhereNull('is_read_by_user');
+            })
+            ->whereHas('contactMessage', function ($query) use ($user) {
+                $query->where('email', $user->email);
+            })
+            ->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'cart' => $user->carts()->count(),
+                'wishlist' => $user->wishlists()->count(),
+                'history' => $user->orders()->count(),
+                'unread' => $unread,
+            ],
+        ]);
     }
 }

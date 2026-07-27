@@ -170,8 +170,9 @@ class EvomiCatalogSeeder extends Seeder
         if (!Promo::exists()) {
             Promo::create([
                 'harga_promo' => 15000,
-                'persentase_promo' => 8,
-                'tanggal_berlaku_promo' => now()->addMonths(3)->toDateString(),
+                'persentase_promo' => null,
+                'tanggal_berlaku_promo' => now()->toDateString(),
+                'tanggal_berakhir_promo' => now()->addMonths(3)->toDateString(),
             ]);
         }
 

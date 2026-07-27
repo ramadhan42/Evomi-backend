@@ -108,6 +108,11 @@ class CmsController extends Controller
         $locale = LocaleResolver::normalize($request->input('locale', 'id'));
 
         foreach ($request->input('fields') as $field) {
+            $payload = [
+                'type' => $field['type'] ?? 'string',
+                'value' => $field['value'] ?? null,
+            ];
+
             SiteContent::updateOrCreate(
                 [
                     'page' => $page,
@@ -115,11 +120,22 @@ class CmsController extends Controller
                     'key' => $field['key'],
                     'locale' => $locale,
                 ],
-                [
-                    'type' => $field['type'] ?? 'string',
-                    'value' => $field['value'] ?? null,
-                ]
+                $payload
             );
+
+            // Layout/style keys are not translated — keep id + en in sync
+            if ($this->isLayoutStyleKey($field['key'])) {
+                $otherLocale = $locale === 'id' ? 'en' : 'id';
+                SiteContent::updateOrCreate(
+                    [
+                        'page' => $page,
+                        'section' => $field['section'],
+                        'key' => $field['key'],
+                        'locale' => $otherLocale,
+                    ],
+                    $payload
+                );
+            }
         }
 
         $rows = SiteContent::where('page', $page)->where('locale', $locale)->get();
@@ -134,6 +150,21 @@ class CmsController extends Controller
             'data' => $grouped,
             'locale' => $locale,
         ]);
+    }
+
+    /**
+     * Keys that control layout/style (not copy) — shared across locales.
+     */
+    private function isLayoutStyleKey(string $key): bool
+    {
+        if (str_starts_with($key, 'wave_')) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/(_mobile|_desktop|_color|_fs_|_size_|_rotate_|_pos_|_left_|_right_|_top_|_bottom_)/',
+            $key
+        );
     }
 
     /**

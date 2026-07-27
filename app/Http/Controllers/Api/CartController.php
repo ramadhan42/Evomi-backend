@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
+use App\Models\Product;
 use App\Support\LocaleResolver;
 use App\Support\ProductLocalizer;
 use Illuminate\Http\Request;
@@ -43,8 +44,32 @@ class CartController extends Controller
         $user = $request->user();
         $qty = $request->quantity ?? 1;
 
+        $product = Product::find($request->product_id);
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk tidak ditemukan.',
+            ], 404);
+        }
+
+        $available = (int) $product->quantity;
+        if ($available <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stok produk habis.',
+            ], 422);
+        }
+
         // Cek apakah produk sudah ada di keranjang (karena ada unique constraint di database)
         $cart = Cart::where('user_id', $user->id)->where('product_id', $request->product_id)->first();
+        $nextQty = ($cart ? (int) $cart->quantity : 0) + $qty;
+
+        if ($nextQty > $available) {
+            return response()->json([
+                'success' => false,
+                'message' => "Stok tidak cukup. Tersedia: {$available}.",
+            ], 422);
+        }
 
         if ($cart) {
             $cart->increment('quantity', $qty);
@@ -76,9 +101,20 @@ class CartController extends Controller
             return response()->json(['success' => false, 'message' => 'Item tidak ditemukan'], 404);
         }
 
+        $product = Product::find($cartItem->product_id);
+        $available = (int) ($product?->quantity ?? 0);
+        $requested = (int) $request->quantity;
+
+        if ($requested > $available) {
+            return response()->json([
+                'success' => false,
+                'message' => "Stok tidak cukup. Tersedia: {$available}.",
+            ], 422);
+        }
+
         // Update nilai quantity
         $cartItem->update([
-            'quantity' => $request->quantity
+            'quantity' => $requested
         ]);
 
         return response()->json([
