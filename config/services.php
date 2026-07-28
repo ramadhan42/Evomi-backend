@@ -35,4 +35,23 @@ return [
         ],
     ],
 
+    /*
+    | Optional seed values for PaymentSettingSeeder.
+    | Runtime source of truth is the payment_settings database row.
+    */
+    'midtrans' => [
+        'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'is_production' => (bool) env('MIDTRANS_IS_PRODUCTION', false),
+        // Notify Midtrans dashboard: {APP_URL}/api/payments/midtrans/notification
+    ],
+
+    'xendit' => [
+        'merchant_id' => env('XENDIT_MERCHANT_ID'),
+        'secret_key' => env('XENDIT_SECRET_KEY'),
+        'callback_token' => env('XENDIT_CALLBACK_TOKEN'),
+        // Notify Xendit dashboard: {APP_URL}/api/payments/xendit/notification
+    ],
+
 ];

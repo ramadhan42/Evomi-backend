@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\KurirController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderTrackingController;
+use App\Http\Controllers\Api\PaymentGatewayController;
+use App\Http\Controllers\Api\PaymentSettingController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\Api\QuizAdminController;
@@ -58,6 +60,14 @@ Route::get('/promos/{id}', [PromoController::class, 'show']);
 Route::get('/cms/faqs', [CmsController::class, 'publicFaqs']);
 Route::get('/cms/{page}', [CmsController::class, 'showPage']);
 
+Route::get('/payment-settings', [PaymentSettingController::class, 'publicShow']);
+
+Route::post('/payments/xendit/qr', [PaymentGatewayController::class, 'createXenditQr']);
+Route::get('/payments/xendit/qr/{id}', [PaymentGatewayController::class, 'showXenditQr']);
+Route::post('/payments/midtrans/snap', [PaymentGatewayController::class, 'createMidtransSnap']);
+Route::post('/payments/midtrans/notification', [PaymentGatewayController::class, 'midtransNotification']);
+Route::post('/payments/xendit/notification', [PaymentGatewayController::class, 'xenditNotification']);
+
 /*
 |--------------------------------------------------------------------------
 | Protected routes (Sanctum)
@@ -107,6 +117,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/wishlists', [WishlistController::class, 'getAllWishlists']);
         Route::get('/users', [UserController::class, 'getAllUsers']);
         Route::get('/revenue', [OrderController::class, 'getTotalRevenue']);
+        Route::post('/users/{id}', [UserController::class, 'updateByAdmin']);
+        Route::put('/users/{id}', [UserController::class, 'updateByAdmin']);
         Route::delete('/users/{id}', [UserController::class, 'destroyByAdmin']);
         Route::get('/subscribers', [NewsletterController::class, 'index']);
 
@@ -158,6 +170,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/cms/upload', [CmsController::class, 'upload']);
         Route::get('/cms/{page}', [CmsController::class, 'adminShowPage']);
         Route::put('/cms/{page}', [CmsController::class, 'adminUpdatePage']);
+
+        Route::get('/payment-settings', [PaymentSettingController::class, 'show']);
+        Route::put('/payment-settings', [PaymentSettingController::class, 'update']);
+        Route::patch('/payment-settings', [PaymentSettingController::class, 'update']);
     });
 
     // Product write + order status + tracking update (admin)

@@ -101,6 +101,70 @@ class UserController extends Controller
     }
 
     /**
+     * UPDATE: Memperbarui user berdasarkan ID (Untuk Admin)
+     */
+    public function updateByAdmin(Request $request, $id)
+    {
+        $user = User::find($id);
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User tidak ditemukan.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'nama_lengkap' => ['nullable', 'string', 'max:255'],
+            'alamat_lengkap' => ['nullable', 'string'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'password' => ['nullable', 'string', 'min:8'],
+            'avatar_profile' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'is_admin' => ['sometimes'],
+        ]);
+
+        if ($request->hasFile('avatar_profile')) {
+            $path = $request->file('avatar_profile')->store('avatars', 'public');
+            $validated['avatar_profile'] = $path;
+        }
+
+        if (! empty($validated['password'])) {
+            $validated['password'] = bcrypt($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        if ($request->has('is_admin')) {
+            $validated['is_admin'] = $request->boolean('is_admin');
+        } else {
+            unset($validated['is_admin']);
+        }
+
+        // Jangan biarkan admin menurunkan role dirinya sendiri
+        if (
+            array_key_exists('is_admin', $validated)
+            && auth()->check()
+            && auth()->id() === $user->id
+            && ! $validated['is_admin']
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak dapat menghapus status admin dari akun sendiri.',
+            ], 403);
+        }
+
+        $user->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data user berhasil diperbarui.',
+            'data' => $user->fresh(),
+        ], 200);
+    }
+
+    /**
      * DELETE: Menghapus user berdasarkan ID (Untuk Admin)
      */
     public function destroyByAdmin($id)
