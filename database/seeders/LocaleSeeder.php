@@ -113,8 +113,10 @@ class LocaleSeeder extends Seeder
             }
         }
 
-        // Hero wave SVG positions (id + en — style, same defaults)
+        // Hero wave SVGs + positions (id + en — style, same defaults)
         foreach (['id', 'en'] as $loc) {
+            $this->put('beranda', 'hero', 'wave_left_icon', 'image', '/src/images/section 1/sayap-kiri.svg', $loc);
+            $this->put('beranda', 'hero', 'wave_right_icon', 'image', '/src/images/section 1/sayap-kanan.svg', $loc);
             $this->put('beranda', 'hero', 'wave_left_left_mobile', 'string', '-24%', $loc);
             $this->put('beranda', 'hero', 'wave_left_left_desktop', 'string', '-11%', $loc);
             $this->put('beranda', 'hero', 'wave_left_top_mobile', 'string', '-44%', $loc);

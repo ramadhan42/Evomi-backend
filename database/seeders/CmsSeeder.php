@@ -93,6 +93,8 @@ class CmsSeeder extends Seeder
             ['beranda', 'hero', 'badge_right_bottom_desktop', 'string', '80.4%'],
 
             // Hero wave SVGs (sayap)
+            ['beranda', 'hero', 'wave_left_icon', 'image', '/src/images/section 1/sayap-kiri.svg'],
+            ['beranda', 'hero', 'wave_right_icon', 'image', '/src/images/section 1/sayap-kanan.svg'],
             ['beranda', 'hero', 'wave_left_left_mobile', 'string', '-24%'],
             ['beranda', 'hero', 'wave_left_left_desktop', 'string', '-11%'],
             ['beranda', 'hero', 'wave_left_top_mobile', 'string', '-44%'],

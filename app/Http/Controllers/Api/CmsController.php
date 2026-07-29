@@ -173,7 +173,8 @@ class CmsController extends Controller
     public function upload(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp,gif|max:5120',
+            // `file` (not `image`) so SVG uploads are allowed for CMS wave/icon assets
+            'image' => 'required|file|mimes:jpeg,png,jpg,webp,gif,svg|max:5120',
         ]);
 
         if ($validator->fails()) {
