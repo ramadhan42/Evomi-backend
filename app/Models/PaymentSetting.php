@@ -13,15 +13,28 @@ class PaymentSetting extends Model
     protected $fillable = [
         'provider',
         'is_production',
+        // legacy shared columns (kept for migration compatibility)
         'merchant_id',
         'client_key',
         'server_key',
+        // Midtrans
+        'midtrans_is_production',
+        'midtrans_merchant_id',
+        'midtrans_client_key',
+        'midtrans_server_key',
+        // Xendit
+        'xendit_is_production',
+        'xendit_merchant_id',
+        'xendit_callback_token',
+        'xendit_secret_key',
         'updated_by',
     ];
 
     protected $attributes = [
         'provider' => 'manual',
         'is_production' => false,
+        'midtrans_is_production' => false,
+        'xendit_is_production' => false,
     ];
 
     public function updater(): BelongsTo
@@ -36,6 +49,8 @@ class PaymentSetting extends Model
             [
                 'provider' => PaymentProvider::Manual->value,
                 'is_production' => false,
+                'midtrans_is_production' => false,
+                'xendit_is_production' => false,
             ],
         );
     }
@@ -55,6 +70,56 @@ class PaymentSetting extends Model
         return $this->provider === PaymentProvider::Manual;
     }
 
+    public function midtransMerchantId(): ?string
+    {
+        return $this->filledOrNull($this->midtrans_merchant_id);
+    }
+
+    public function midtransClientKey(): ?string
+    {
+        return $this->filledOrNull($this->midtrans_client_key);
+    }
+
+    public function midtransServerKey(): ?string
+    {
+        return $this->filledOrNull($this->midtrans_server_key);
+    }
+
+    public function midtransIsProduction(): bool
+    {
+        return (bool) $this->midtrans_is_production;
+    }
+
+    public function xenditMerchantId(): ?string
+    {
+        return $this->filledOrNull($this->xendit_merchant_id);
+    }
+
+    public function xenditCallbackToken(): ?string
+    {
+        return $this->filledOrNull($this->xendit_callback_token);
+    }
+
+    public function xenditSecretKey(): ?string
+    {
+        return $this->filledOrNull($this->xendit_secret_key);
+    }
+
+    public function xenditIsProduction(): bool
+    {
+        return (bool) $this->xendit_is_production;
+    }
+
+    public function isMidtransConfigured(): bool
+    {
+        return filled($this->midtransClientKey()) && filled($this->midtransServerKey());
+    }
+
+    public function isXenditConfigured(): bool
+    {
+        return filled($this->xenditCallbackToken()) && filled($this->xenditSecretKey());
+    }
+
     public function isConfigured(): bool
     {
         if ($this->usesManual()) {
@@ -62,25 +127,24 @@ class PaymentSetting extends Model
         }
 
         if ($this->usesMidtrans()) {
-            return filled($this->client_key) && filled($this->server_key);
+            return $this->isMidtransConfigured();
         }
 
         if ($this->usesXendit()) {
-            // Secret key required; callback token stored in client_key.
-            return filled($this->server_key) && filled($this->client_key);
+            return $this->isXenditConfigured();
         }
 
         return false;
     }
 
-    public function maskedServerKey(): ?string
+    public function maskSecret(?string $key): ?string
     {
-        if (! filled($this->server_key)) {
+        if (! filled($key)) {
             return null;
         }
 
-        $key = (string) $this->server_key;
-        $suffix = strlen($key) <= 4 ? $key : substr($key, -4);
+        $value = (string) $key;
+        $suffix = strlen($value) <= 4 ? $value : substr($value, -4);
 
         return '****'.$suffix;
     }
@@ -90,7 +154,20 @@ class PaymentSetting extends Model
         return [
             'provider' => PaymentProvider::class,
             'is_production' => 'boolean',
+            'midtrans_is_production' => 'boolean',
+            'xendit_is_production' => 'boolean',
             'server_key' => 'encrypted',
+            'midtrans_server_key' => 'encrypted',
+            'xendit_secret_key' => 'encrypted',
         ];
+    }
+
+    private function filledOrNull(mixed $value): ?string
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        return (string) $value;
     }
 }

@@ -23,15 +23,16 @@ class XenditClient
     public function createQrCode(array $payload): array
     {
         $settings = $this->settings();
+        $secretKey = trim((string) ($settings->xenditSecretKey() ?? ''));
 
-        if (! $settings->usesXendit() || ! $settings->isConfigured()) {
+        if (! $settings->usesXendit() || ! $settings->isConfigured() || $secretKey === '') {
             throw ValidationException::withMessages([
                 'payment' => ['Xendit belum dikonfigurasi. Isi kredensial di Pengaturan Pembayaran.'],
             ]);
         }
 
         try {
-            $response = Http::withBasicAuth((string) $settings->server_key, '')
+            $response = Http::withBasicAuth($secretKey, '')
                 ->withHeaders(['api-version' => '2022-07-31'])
                 ->acceptJson()
                 ->asJson()
@@ -69,15 +70,16 @@ class XenditClient
     public function getQrCode(string $id): array
     {
         $settings = $this->settings();
+        $secretKey = trim((string) ($settings->xenditSecretKey() ?? ''));
 
-        if (! $settings->usesXendit() || ! filled($settings->server_key)) {
+        if (! $settings->usesXendit() || $secretKey === '') {
             throw ValidationException::withMessages([
                 'payment' => ['Xendit belum dikonfigurasi.'],
             ]);
         }
 
         try {
-            return Http::withBasicAuth((string) $settings->server_key, '')
+            return Http::withBasicAuth($secretKey, '')
                 ->withHeaders(['api-version' => '2022-07-31'])
                 ->acceptJson()
                 ->timeout(20)
@@ -96,7 +98,7 @@ class XenditClient
 
     public function verifyCallbackToken(?string $callbackToken): bool
     {
-        $expected = (string) $this->settings()->client_key;
+        $expected = (string) ($this->settings()->xenditCallbackToken() ?? '');
 
         if ($expected === '' || $callbackToken === null || $callbackToken === '') {
             return false;

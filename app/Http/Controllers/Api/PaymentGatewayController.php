@@ -103,6 +103,123 @@ class PaymentGatewayController extends Controller
     }
 
     /**
+     * POST /api/payments/midtrans/qris
+     * Core API charge: POST /v2/charge with payment_type=qris
+     * Body: { order_id, amount, customer_name?, customer_email?, customer_phone?, item_name?, item_id? }
+     */
+    public function createMidtransQris(Request $request, MidtransClient $midtrans)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|string|max:80',
+            'amount' => 'required|numeric|min:1',
+            'customer_name' => 'nullable|string|max:255',
+            'customer_email' => 'nullable|email|max:255',
+            'customer_phone' => 'nullable|string|max:30',
+            'item_name' => 'nullable|string|max:255',
+            'item_id' => 'nullable|string|max:80',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+        $amount = (int) round((float) $data['amount']);
+        $fullName = trim((string) ($data['customer_name'] ?? ''));
+        $nameParts = preg_split('/\s+/', $fullName, 2) ?: [];
+        $firstName = $nameParts[0] ?? 'Customer';
+        $lastName = $nameParts[1] ?? '';
+
+        try {
+            $qris = $midtrans->createQrisCharge([
+                'payment_type' => 'qris',
+                'transaction_details' => [
+                    'order_id' => $data['order_id'],
+                    'gross_amount' => $amount,
+                ],
+                'item_details' => [[
+                    'id' => (string) ($data['item_id'] ?? 'evomi-order'),
+                    'price' => $amount,
+                    'quantity' => 1,
+                    'name' => $data['item_name'] ?? 'Pesanan Evomi',
+                ]],
+                'customer_details' => array_filter([
+                    'first_name' => $firstName !== '' ? $firstName : 'Customer',
+                    'last_name' => $lastName !== '' ? $lastName : null,
+                    'email' => $data['customer_email'] ?? null,
+                    'phone' => $data['customer_phone'] ?? null,
+                ]),
+                'qris' => [
+                    'acquirer' => 'gopay',
+                ],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $qris['transaction_id'],
+                    'transaction_id' => $qris['transaction_id'],
+                    'order_id' => $qris['order_id'],
+                    'qr_string' => $qris['qr_string'],
+                    'status' => $qris['status'] ?? null,
+                    'expiry_time' => $qris['expiry_time'] ?? null,
+                    'invoice_id' => $data['order_id'],
+                    'is_production' => $midtrans->isProductionEnvironment(),
+                ],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?: 'Gagal membuat QRIS Midtrans.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('Midtrans QRIS create failed', ['detail' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat QRIS Midtrans.',
+            ], 500);
+        }
+    }
+
+    /** GET /api/payments/midtrans/qris/{orderId} — status by order_id */
+    public function showMidtransQris(string $orderId, MidtransClient $midtrans)
+    {
+        try {
+            $status = $midtrans->getTransactionStatus($orderId);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $status['transaction_id'] ?? $orderId,
+                    'order_id' => $status['order_id'] ?? $orderId,
+                    'status' => $status['transaction_status'] ?? null,
+                    'fraud_status' => $status['fraud_status'] ?? null,
+                    'payment_type' => $status['payment_type'] ?? null,
+                ],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?: 'Gagal cek status QRIS Midtrans.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('Midtrans QRIS status failed', ['detail' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengecek status QRIS Midtrans.',
+            ], 500);
+        }
+    }
+
+    /**
      * POST /api/payments/midtrans/snap
      * Body: { order_id, amount, customer_name?, customer_email?, item_name? }
      */
@@ -151,8 +268,8 @@ class PaymentGatewayController extends Controller
                 'data' => [
                     'token' => $snap['token'],
                     'redirect_url' => $snap['redirect_url'] ?? null,
-                    'client_key' => $settings->client_key,
-                    'is_production' => (bool) $settings->is_production,
+                    'client_key' => $settings->midtransClientKey(),
+                    'is_production' => $midtrans->isProductionEnvironment(),
                     'order_id' => $data['order_id'],
                 ],
             ]);

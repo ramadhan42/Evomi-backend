@@ -64,6 +64,8 @@ Route::get('/payment-settings', [PaymentSettingController::class, 'publicShow'])
 
 Route::post('/payments/xendit/qr', [PaymentGatewayController::class, 'createXenditQr']);
 Route::get('/payments/xendit/qr/{id}', [PaymentGatewayController::class, 'showXenditQr']);
+Route::post('/payments/midtrans/qris', [PaymentGatewayController::class, 'createMidtransQris']);
+Route::get('/payments/midtrans/qris/{orderId}', [PaymentGatewayController::class, 'showMidtransQris']);
 Route::post('/payments/midtrans/snap', [PaymentGatewayController::class, 'createMidtransSnap']);
 Route::post('/payments/midtrans/notification', [PaymentGatewayController::class, 'midtransNotification']);
 Route::post('/payments/xendit/notification', [PaymentGatewayController::class, 'xenditNotification']);
