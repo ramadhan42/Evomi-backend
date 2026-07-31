@@ -40,6 +40,7 @@ class LocaleSeeder extends Seeder
             'beranda' => 'Home',
             'tentang' => 'About',
             'belanja' => 'Shop',
+            'artikel' => 'Articles',
             'kuis' => 'Quiz',
             'login' => 'Login',
             'register' => 'Sign Up',

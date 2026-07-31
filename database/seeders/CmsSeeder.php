@@ -310,6 +310,7 @@ class CmsSeeder extends Seeder
             ['navbar', 'menu', 'beranda', 'string', 'Beranda'],
             ['navbar', 'menu', 'tentang', 'string', 'Tentang'],
             ['navbar', 'menu', 'belanja', 'string', 'Belanja'],
+            ['navbar', 'menu', 'artikel', 'string', 'Artikel'],
             ['navbar', 'menu', 'kuis', 'string', 'Kuis'],
             ['navbar', 'menu', 'login', 'string', 'Login'],
             ['navbar', 'menu', 'register', 'string', 'Daftar'],

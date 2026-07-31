@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             LocaleSeeder::class,
             ShopCmsSeeder::class,
             PaymentSettingSeeder::class,
+            ArticleSeeder::class,
         ]);
     }
 }

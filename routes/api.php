@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CmsController;
@@ -56,6 +57,9 @@ Route::get('/kurirs', [KurirController::class, 'index']);
 Route::get('/kurirs/{id}', [KurirController::class, 'show']);
 Route::get('/promos', [PromoController::class, 'index']);
 Route::get('/promos/{id}', [PromoController::class, 'show']);
+
+Route::get('/articles', [ArticleController::class, 'index']);
+Route::get('/articles/{slug}', [ArticleController::class, 'show']);
 
 Route::get('/cms/faqs', [CmsController::class, 'publicFaqs']);
 Route::get('/cms/{page}', [CmsController::class, 'showPage']);
@@ -137,6 +141,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/promos', [PromoController::class, 'store']);
         Route::put('/promos/{id}', [PromoController::class, 'update']);
         Route::delete('/promos/{id}', [PromoController::class, 'destroy']);
+
+        Route::get('/articles', [ArticleController::class, 'adminIndex']);
+        Route::get('/articles/{id}', [ArticleController::class, 'adminShow']);
+        Route::post('/articles', [ArticleController::class, 'store']);
+        Route::post('/articles/{id}', [ArticleController::class, 'update']);
+        Route::put('/articles/{id}', [ArticleController::class, 'update']);
+        Route::delete('/articles/{id}', [ArticleController::class, 'destroy']);
 
         Route::post('/contact/{id}/reply', [ContactMessageController::class, 'reply']);
         Route::get('/contact/conversations', [ContactMessageController::class, 'conversations']);
