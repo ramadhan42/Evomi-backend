@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Support\LocaleResolver;
+use App\Support\PublicContentCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
+    /** Max upload size in KB — Hostinger shared PHP memory cannot handle ~70MB images. */
+    private const MAX_IMAGE_KB = 5120;
+
     private const LOCALIZED_FIELDS = [
         'title',
         'description',
@@ -39,8 +44,18 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $locale = LocaleResolver::normalize($request->query('locale', 'id'));
-        $products = Product::orderBy('id', 'asc')->get()
-            ->map(fn (Product $p) => $this->localizeProduct($p, $locale));
+
+        $products = Cache::remember(
+            PublicContentCache::productsKey($locale),
+            PublicContentCache::TTL_SECONDS,
+            function () use ($locale) {
+                return Product::query()
+                    ->orderBy('id', 'asc')
+                    ->get()
+                    ->map(fn (Product $p) => $this->localizeProduct($p, $locale))
+                    ->all();
+            }
+        );
 
         return response()->json([
             'success' => true,
@@ -54,7 +69,7 @@ class ProductController extends Controller
         $locale = LocaleResolver::normalize($request->query('locale', 'id'));
         $product = Product::find($id);
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
@@ -82,11 +97,11 @@ class ProductController extends Controller
             'middle_note_en' => 'nullable|string|max:255',
             'base_note' => 'nullable|string|max:255',
             'base_note_en' => 'nullable|string|max:255',
-            'image_1' => 'required|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_produk_belanja' => 'required|image|mimes:jpeg,png,jpg,webp|max:70048',
+            'image_1' => 'required|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_produk_belanja' => 'required|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
             'bottle_size' => 'required|integer',
             'perfume_type' => 'required|string|max:255',
             'perfume_type_en' => 'nullable|string|max:255',
@@ -125,10 +140,12 @@ class ProductController extends Controller
         }
 
         $product = Product::create($data);
-        if (array_key_exists('quantity', $data) && !array_key_exists('stock_status', $data)) {
+        if (array_key_exists('quantity', $data) && ! array_key_exists('stock_status', $data)) {
             $product->applyStockStatusFromQuantity();
             $product->save();
         }
+
+        PublicContentCache::forgetProducts();
 
         return response()->json([
             'success' => true,
@@ -141,7 +158,7 @@ class ProductController extends Controller
     {
         $product = Product::find($id);
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
@@ -160,11 +177,11 @@ class ProductController extends Controller
             'middle_note_en' => 'nullable|string|max:255',
             'base_note' => 'nullable|string|max:255',
             'base_note_en' => 'nullable|string|max:255',
-            'image_1' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
-            'image_produk_belanja' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:70048',
+            'image_1' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_2' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_3' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_4' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
+            'image_produk_belanja' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:'.self::MAX_IMAGE_KB,
             'bottle_size' => 'sometimes|required|integer',
             'perfume_type' => 'sometimes|required|string|max:255',
             'perfume_type_en' => 'nullable|string|max:255',
@@ -208,10 +225,12 @@ class ProductController extends Controller
         $product->update($data);
 
         // Jika admin hanya mengubah angka stok tanpa status, sync label otomatis
-        if (array_key_exists('quantity', $data) && !array_key_exists('stock_status', $data)) {
+        if (array_key_exists('quantity', $data) && ! array_key_exists('stock_status', $data)) {
             $product->applyStockStatusFromQuantity();
             $product->save();
         }
+
+        PublicContentCache::forgetProducts();
 
         return response()->json([
             'success' => true,
@@ -224,7 +243,7 @@ class ProductController extends Controller
     {
         $product = Product::find($id);
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['success' => false, 'message' => 'Produk tidak ditemukan'], 404);
         }
 
@@ -236,6 +255,8 @@ class ProductController extends Controller
         }
 
         $product->delete();
+
+        PublicContentCache::forgetProducts();
 
         return response()->json(['success' => true, 'message' => 'Produk berhasil dihapus'], 200);
     }

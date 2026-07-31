@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Faq;
 use App\Models\SiteContent;
 use App\Support\LocaleResolver;
+use App\Support\PublicContentCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -20,20 +22,28 @@ class CmsController extends Controller
     {
         $locale = LocaleResolver::normalize($request->query('locale', 'id'));
 
-        $idRows = SiteContent::where('page', $page)->where('locale', 'id')->get();
-        $grouped = [];
-        foreach ($idRows as $row) {
-            $grouped[$row->section][$row->key] = $row->value;
-        }
-
-        if ($locale === 'en') {
-            $enRows = SiteContent::where('page', $page)->where('locale', 'en')->get();
-            foreach ($enRows as $row) {
-                if ($row->value !== null && $row->value !== '') {
+        $grouped = Cache::remember(
+            PublicContentCache::cmsPageKey($page, $locale),
+            PublicContentCache::TTL_SECONDS,
+            function () use ($page, $locale) {
+                $idRows = SiteContent::where('page', $page)->where('locale', 'id')->get();
+                $grouped = [];
+                foreach ($idRows as $row) {
                     $grouped[$row->section][$row->key] = $row->value;
                 }
+
+                if ($locale === 'en') {
+                    $enRows = SiteContent::where('page', $page)->where('locale', 'en')->get();
+                    foreach ($enRows as $row) {
+                        if ($row->value !== null && $row->value !== '') {
+                            $grouped[$row->section][$row->key] = $row->value;
+                        }
+                    }
+                }
+
+                return $grouped;
             }
-        }
+        );
 
         return response()->json([
             'success' => true,
@@ -138,6 +148,8 @@ class CmsController extends Controller
             }
         }
 
+        PublicContentCache::forgetCms($page);
+
         $rows = SiteContent::where('page', $page)->where('locale', $locale)->get();
         $grouped = [];
         foreach ($rows as $row) {
@@ -204,18 +216,26 @@ class CmsController extends Controller
     {
         $locale = LocaleResolver::normalize($request->query('locale', 'id'));
 
-        $faqs = Faq::where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get()
-            ->map(function (Faq $faq) use ($locale) {
-                $data = $faq->toArray();
-                return LocaleResolver::resolveFields(
-                    $data,
-                    ['category', 'question', 'answer'],
-                    $locale
-                );
-            });
+        $faqs = Cache::remember(
+            PublicContentCache::faqsKey($locale),
+            PublicContentCache::TTL_SECONDS,
+            function () use ($locale) {
+                return Faq::where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->get()
+                    ->map(function (Faq $faq) use ($locale) {
+                        $data = $faq->toArray();
+
+                        return LocaleResolver::resolveFields(
+                            $data,
+                            ['category', 'question', 'answer'],
+                            $locale
+                        );
+                    })
+                    ->all();
+            }
+        );
 
         return response()->json([
             'success' => true,
@@ -264,6 +284,8 @@ class CmsController extends Controller
             'is_active' => $validated['is_active'] ?? true,
         ]);
 
+        PublicContentCache::forgetFaqs();
+
         return response()->json([
             'success' => true,
             'message' => 'FAQ ditambahkan.',
@@ -277,7 +299,7 @@ class CmsController extends Controller
     public function updateFaq(Request $request, $id)
     {
         $faq = Faq::find($id);
-        if (!$faq) {
+        if (! $faq) {
             return response()->json(['success' => false, 'message' => 'FAQ tidak ditemukan.'], 404);
         }
 
@@ -294,6 +316,8 @@ class CmsController extends Controller
 
         $faq->update($validated);
 
+        PublicContentCache::forgetFaqs();
+
         return response()->json([
             'success' => true,
             'message' => 'FAQ diperbarui.',
@@ -307,11 +331,13 @@ class CmsController extends Controller
     public function destroyFaq($id)
     {
         $faq = Faq::find($id);
-        if (!$faq) {
+        if (! $faq) {
             return response()->json(['success' => false, 'message' => 'FAQ tidak ditemukan.'], 404);
         }
 
         $faq->delete();
+
+        PublicContentCache::forgetFaqs();
 
         return response()->json([
             'success' => true,

@@ -17,7 +17,12 @@ return [
 
     'paths' => ['api/*', 'sanctum/csrf-cookie', '*'], // Izinkan route api
     'allowed_methods' => ['*'], // Izinkan GET, POST, dll
-    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000'], // Masukkan URL Next.js kamu
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://evomi.shop',
+        'https://www.evomi.shop',
+    ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],

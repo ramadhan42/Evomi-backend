@@ -232,13 +232,13 @@ class UserController extends Controller
     {
         $user = $request->user();
 
+        // Join instead of whereHas to avoid correlated subquery cost on Hostinger
         $unread = ContactReply::query()
+            ->join('contact_messages', 'contact_replies.contact_message_id', '=', 'contact_messages.id')
+            ->where('contact_messages.email', $user->email)
             ->where(function ($q) {
-                $q->where('is_read_by_user', false)
-                    ->orWhereNull('is_read_by_user');
-            })
-            ->whereHas('contactMessage', function ($query) use ($user) {
-                $query->where('email', $user->email);
+                $q->where('contact_replies.is_read_by_user', false)
+                    ->orWhereNull('contact_replies.is_read_by_user');
             })
             ->count();
 

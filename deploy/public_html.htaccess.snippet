@@ -1,0 +1,11 @@
+# Paste this NEAR THE TOP of public_html/.htaccess (website root),
+# BEFORE any frontend SPA / Next.js catch-all rules.
+#
+# Goal: let /backend/* be handled by Laravel, not the frontend 404 page.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Do not rewrite Laravel backend requests
+    RewriteRule ^backend(/|$) - [L]
+</IfModule>

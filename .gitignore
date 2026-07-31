@@ -31,3 +31,9 @@ frankenphp
 frankenphp-worker.php
 
 /storage/app/email-thumbs
+
+# Never upload these to Hostinger — they blow disk / inode limits
+*.zip
+*.rar
+*.7z
+/evomi-backend.zip
