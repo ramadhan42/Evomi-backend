@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    /** Max upload size in KB — Hostinger shared PHP memory cannot handle ~70MB images. */
-    private const MAX_IMAGE_KB = 5120;
+    /** Max upload size in KB (40MB per product image). */
+    private const MAX_IMAGE_KB = 40960;
 
     private const LOCALIZED_FIELDS = [
         'title',
