@@ -17,8 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Hostinger / reverse proxy terminates SSL in front of PHP
         $middleware->trustProxies(at: '*');
 
-        // Keep shared hosting workers from being flooded
-        $middleware->throttleApi('60,1');
+        // Shared hosting flood guard (skip very early local check via env())
+        if (env('APP_ENV', 'production') !== 'local') {
+            $middleware->throttleApi('60,1');
+        }
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,

@@ -168,6 +168,8 @@ class CmsSeeder extends Seeder
             ['beranda', 'second', 'headline_1', 'string', 'Kenalan sama'],
             ['beranda', 'second', 'headline_2', 'string', 'karakter '],
             ['beranda', 'second', 'headline_3', 'string', 'kita yuk!'],
+            ['beranda', 'second', 'card_icon_size_mobile', 'string', '100px'],
+            ['beranda', 'second', 'card_icon_size_desktop', 'string', '140px'],
             ['beranda', 'second', 'cta_label', 'string', 'Lihat Semua Karakter'],
             ['beranda', 'second', 'card1_name', 'string', "Purpose\nPrestige"],
             ['beranda', 'second', 'card1_title', 'string', 'Purpose Prestige'],
