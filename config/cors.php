@@ -22,11 +22,14 @@ return [
         'http://127.0.0.1:3000',
         'https://evomi.shop',
         'https://www.evomi.shop',
-        // Vercel frontend (branch `vercel` only — Hostinger site stays on main)
+        // Vercel frontends (branch `vercel` only — Hostinger site stays on main)
+        'https://evomi-rama.vercel.app',
         'https://belajar-frontend-website-v2.vercel.app',
     ],
     'allowed_origins_patterns' => [
-        // Vercel preview deployments for this project
+        // Vercel preview deployments
+        '#^https://evomi-rama(-[a-z0-9-]+)?\.vercel\.app$#',
+        '#^https://evomi-rama-[a-z0-9-]+-[a-z0-9-]+\.vercel\.app$#',
         '#^https://belajar-frontend-website-v2(-[a-z0-9-]+)?\.vercel\.app$#',
         '#^https://belajar-frontend-website-v2-[a-z0-9-]+-[a-z0-9-]+\.vercel\.app$#',
     ],
