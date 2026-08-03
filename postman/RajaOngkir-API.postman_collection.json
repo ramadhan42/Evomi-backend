@@ -1,0 +1,185 @@
+{
+  "info": {
+    "_postman_id": "evomi-rajaongkir-collection",
+    "name": "RajaOngkir API (Komerce v1)",
+    "description": "RajaOngkir Shipping Cost for Evomi.\n\nPakai environment **RajaOngkir - Evomi**.\nHeader auth ongkir: `key: {{rajaongkir_api_key}}` (Shipping Cost).\n\nPayment/QRIS keys ada di environment tapi TIDAK dipakai request ongkir.\n\nAlur: Search Destination → salin id ke origin_id/destination_id → Calculate Domestic Cost.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://rajaongkir.komerce.id/api/v1"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Destination",
+      "item": [
+        {
+          "name": "Search Domestic Destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const rows = json?.data || json?.rajaongkir?.results || [];",
+                  "  if (Array.isArray(rows) && rows.length && rows[0].id) {",
+                  "    pm.environment.set('origin_id', String(rows[0].id));",
+                  "    console.log('Saved origin_id =', rows[0].id, rows[0].label || rows[0].name || '');",
+                  "  }",
+                  "} catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "key",
+                "value": "{{rajaongkir_api_key}}",
+                "description": "Shipping Cost API key"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/destination/domestic-destination?search={{search_destination}}&limit=10&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["destination", "domestic-destination"],
+              "query": [
+                { "key": "search", "value": "{{search_destination}}" },
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Cari destinasi domestik. Test script menyimpan id pertama ke origin_id."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Destination (set destination_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  const rows = json?.data || json?.rajaongkir?.results || [];",
+                  "  if (Array.isArray(rows) && rows.length && rows[0].id) {",
+                  "    pm.environment.set('destination_id', String(rows[0].id));",
+                  "    console.log('Saved destination_id =', rows[0].id, rows[0].label || rows[0].name || '');",
+                  "  }",
+                  "} catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "key",
+                "value": "{{rajaongkir_api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/destination/domestic-destination?search=surabaya&limit=10&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["destination", "domestic-destination"],
+              "query": [
+                { "key": "search", "value": "surabaya" },
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Contoh cari tujuan Surabaya; menyimpan id pertama ke destination_id."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Cost",
+      "item": [
+        {
+          "name": "Calculate Domestic Cost",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "key",
+                "value": "{{rajaongkir_api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "origin", "value": "{{origin_id}}" },
+                { "key": "destination", "value": "{{destination_id}}" },
+                { "key": "weight", "value": "{{weight_grams}}" },
+                { "key": "courier", "value": "{{courier_code}}" },
+                { "key": "price", "value": "lowest" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/calculate/domestic-cost",
+              "host": ["{{base_url}}"],
+              "path": ["calculate", "domestic-cost"]
+            },
+            "description": "Hitung ongkir. Butuh origin_id & destination_id dari request Destination."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Tracking",
+      "item": [
+        {
+          "name": "Track Waybill (AWB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "key",
+                "value": "{{rajaongkir_api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "awb", "value": "{{awb_number}}" },
+                { "key": "courier", "value": "{{courier_code}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/track/waybill",
+              "host": ["{{base_url}}"],
+              "path": ["track", "waybill"]
+            },
+            "description": "Lacak resi. Isi awb_number di environment."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,8 @@ class User extends Authenticatable
         'alamat_lengkap',
         'phone',
         'avatar_profile',
+        'last_login_at',
+        'last_seen_at',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -34,6 +36,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'last_login_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 

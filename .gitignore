@@ -3,6 +3,10 @@
 .env
 .env.backup
 .env.production
+
+# Postman env with real API keys (use *.example.json instead)
+/postman/*postman_environment.json
+!/postman/*postman_environment.example.json
 .phpactor.json
 .phpunit.result.cache
 /.codex

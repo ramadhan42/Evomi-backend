@@ -19,14 +19,18 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
+        $now = now();
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
             'is_admin' => false,
+            'last_login_at' => $now,
+            'last_seen_at' => $now,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json(['user' => $user, 'token' => $token], 201);
     }
 
@@ -36,19 +40,26 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages(['email' => ['Kredensial salah.']]);
         }
 
         // Pastikan email admin dari .env selalu punya flag is_admin
         $adminEmail = config('evomi.development_admin.email');
         if (is_string($adminEmail) && $adminEmail !== '' && strcasecmp($user->email, $adminEmail) === 0) {
-            if (!$user->is_admin) {
+            if (! $user->is_admin) {
                 $user->forceFill(['is_admin' => true])->save();
             }
         }
 
+        $now = now();
+        $user->forceFill([
+            'last_login_at' => $now,
+            'last_seen_at' => $now,
+        ])->save();
+
         $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json(['user' => $user->fresh(), 'token' => $token]);
     }
 
@@ -76,13 +87,14 @@ class AuthController extends Controller
         // 4. Kembalikan response sukses
         return response()->json([
             'success' => true,
-            'message' => 'Password berhasil diperbarui. Silakan login dengan password baru Anda.'
+            'message' => 'Password berhasil diperbarui. Silakan login dengan password baru Anda.',
         ], 200);
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
+
         return response()->json(['message' => 'Logged out successfully']);
     }
 
@@ -95,13 +107,14 @@ class AuthController extends Controller
         $tokenString = $request->input('token');
 
         if ($tokenString) {
-            // Karena plainTextToken Sanctum biasanya berbentuk "id|token_hash", 
+            // Karena plainTextToken Sanctum biasanya berbentuk "id|token_hash",
             // kita cari token asli tersebut menggunakan static method findToken dari Sanctum
             $token = PersonalAccessToken::findToken($tokenString);
 
             if ($token) {
                 // Hapus token dari database (menghancurkan sesi login)
                 $token->delete();
+
                 return response()->json(['status' => 'success', 'message' => 'Beacon logout successful']);
             }
         }
