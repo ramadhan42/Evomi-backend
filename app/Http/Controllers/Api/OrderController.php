@@ -29,17 +29,17 @@ class OrderController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.'
+                'message' => 'Pesanan tidak ditemukan atau Anda tidak memiliki akses.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Detail pesanan berhasil diambil.',
-            'data' => $order
+            'data' => $order,
         ], 200);
     }
 
@@ -53,25 +53,28 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Semua data pesanan berhasil diambil.',
-            'data' => $orders
+            'data' => $orders,
         ], 200);
     }
 
     /**
-     * DASHBOARD STATS: Mengambil ringkasan total pendapatan termasuk ongkir (Untuk Admin)
+     * DASHBOARD STATS: Ringkasan pendapatan — hanya pembayaran berhasil (success).
+     * Pending / cancelled tidak dihitung.
      */
     public function getTotalRevenue()
     {
-        $totalProductPrice = (float) Order::sum('total_price');
-        $totalShippingRevenue = (float) Order::sum('shipping_cost');
-        $totalPromoDiscount = (float) Order::sum('promo_discount');
-        $totalQuantitySold = (int) Order::sum('quantity');
-        $totalOrdersCount = Order::count();
+        $paid = Order::query()->successfulPayment();
+
+        $totalProductPrice = (float) (clone $paid)->sum('total_price');
+        $totalShippingRevenue = (float) (clone $paid)->sum('shipping_cost');
+        $totalPromoDiscount = (float) (clone $paid)->sum('promo_discount');
+        $totalQuantitySold = (int) (clone $paid)->sum('quantity');
+        $totalOrdersCount = (clone $paid)->count();
         $totalRevenue = max(0, $totalProductPrice + $totalShippingRevenue - $totalPromoDiscount);
 
         return response()->json([
             'success' => true,
-            'message' => 'Data ringkasan pendapatan admin (produk + ongkir − promo) berhasil dimuat.',
+            'message' => 'Data ringkasan pendapatan admin (hanya pembayaran berhasil) berhasil dimuat.',
             'data' => [
                 'total_revenue' => (int) $totalRevenue,
                 'total_revenue_clean' => (int) max(0, $totalProductPrice - $totalPromoDiscount),
@@ -91,28 +94,32 @@ class OrderController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Sesi login tidak valid. Harap login kembali.'
+                'message' => 'Sesi login tidak valid. Harap login kembali.',
             ], 401);
         }
 
         $items = $request->input('items');
         $invoiceId = $request->input('invoice_id');
         $metodePembayaran = $request->input('payment_method', 'Cash on Delivery');
+        $paymentStatus = Order::resolveCheckoutPaymentStatus(
+            $metodePembayaran,
+            $request->input('payment_status'),
+        );
 
-        if (empty($items) || !is_array($items)) {
+        if (empty($items) || ! is_array($items)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Daftar pesanan kosong atau tidak valid'
+                'message' => 'Daftar pesanan kosong atau tidak valid',
             ], 400);
         }
 
-        if (!$invoiceId) {
+        if (! $invoiceId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invoice ID tidak valid'
+                'message' => 'Invoice ID tidak valid',
             ], 400);
         }
 
@@ -129,13 +136,14 @@ class OrderController extends Controller
                 $invoiceId,
                 $now,
                 $metodePembayaran,
+                $paymentStatus,
                 $guestEmailFromRequest,
                 $shippingCost,
                 $promoDiscount,
                 &$createdOrders
             ) {
                 foreach ($items as $index => $item) {
-                    $orderId = count($items) > 1 ? "{$invoiceId}-" . ($index + 1) : $invoiceId;
+                    $orderId = count($items) > 1 ? "{$invoiceId}-".($index + 1) : $invoiceId;
                     $productId = (int) ($item['product_id'] ?? 0);
                     $qty = (int) ($item['quantity'] ?? 0);
 
@@ -144,7 +152,7 @@ class OrderController extends Controller
                     }
 
                     $product = Product::where('id', $productId)->lockForUpdate()->first();
-                    if (!$product) {
+                    if (! $product) {
                         throw new \RuntimeException("Produk #{$productId} tidak ditemukan.");
                     }
                     $product->decrementStock($qty);
@@ -162,8 +170,9 @@ class OrderController extends Controller
                         'promo_discount' => $index === 0 ? $promoDiscount : 0,
                         'status' => 'menunggu_konfirmasi',
                         'metode_pembayaran' => $metodePembayaran,
+                        'payment_status' => $paymentStatus,
                         'created_at' => $now,
-                        'updated_at' => $now
+                        'updated_at' => $now,
                     ]);
                 }
 
@@ -197,16 +206,18 @@ class OrderController extends Controller
 
         } catch (\RuntimeException $e) {
             Log::warning('Checkout stock/validation:', ['detail' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
         } catch (\Exception $e) {
             Log::error('Error Checkout:', ['detail' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses pembuatan pesanan',
-                'error_detail' => $e->getMessage()
+                'error_detail' => $e->getMessage(),
             ], 500);
         }
     }
@@ -220,6 +231,7 @@ class OrderController extends Controller
             'guest_email' => 'required|email|max:255',
             'invoice_id' => 'required|string|max:80',
             'payment_method' => 'required|string|max:80',
+            'payment_status' => ['nullable', 'string', Rule::in(Order::PAYMENT_STATUSES)],
             'total' => 'nullable|numeric|min:0',
             'shipping_cost' => 'nullable|numeric|min:0',
             'promo_discount' => 'nullable|numeric|min:0',
@@ -247,6 +259,10 @@ class OrderController extends Controller
         $invoiceId = $data['invoice_id'];
         $guestEmail = $data['guest_email'];
         $metodePembayaran = $data['payment_method'];
+        $paymentStatus = Order::resolveCheckoutPaymentStatus(
+            $metodePembayaran,
+            $data['payment_status'] ?? null,
+        );
         $shippingCost = max(0, (float) ($data['shipping_cost'] ?? 0));
         $promoDiscount = max(0, (float) ($data['promo_discount'] ?? 0));
         $now = now();
@@ -260,6 +276,7 @@ class OrderController extends Controller
                 $invoiceId,
                 $guestEmail,
                 $metodePembayaran,
+                $paymentStatus,
                 $shippingCost,
                 $promoDiscount,
                 $now,
@@ -269,7 +286,7 @@ class OrderController extends Controller
                 $qty = (int) $item['quantity'];
 
                 $product = Product::where('id', $productId)->lockForUpdate()->first();
-                if (!$product) {
+                if (! $product) {
                     throw new \RuntimeException("Produk #{$productId} tidak ditemukan.");
                 }
                 $product->decrementStock($qty);
@@ -285,6 +302,7 @@ class OrderController extends Controller
                     'promo_discount' => $promoDiscount,
                     'status' => 'menunggu_konfirmasi',
                     'metode_pembayaran' => $metodePembayaran,
+                    'payment_status' => $paymentStatus,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -336,17 +354,19 @@ class OrderController extends Controller
                 'message' => 'Checkout berhasil!',
                 'data' => [
                     'order_id' => $invoiceId,
-                    'tracking_url_hint' => $frontend . '/pengiriman/' . $invoiceId,
+                    'tracking_url_hint' => $frontend.'/pengiriman/'.$invoiceId,
                 ],
             ], 200);
         } catch (\RuntimeException $e) {
             Log::warning('Guest checkout stock/validation:', ['detail' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
         } catch (\Exception $e) {
             Log::error('Error Guest Checkout:', ['detail' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses pembuatan pesanan',
@@ -370,12 +390,12 @@ class OrderController extends Controller
         try {
             $mailItems = array_map(function ($item) {
                 $product = null;
-                if (!empty($item['product_id'])) {
+                if (! empty($item['product_id'])) {
                     $product = Product::find($item['product_id']);
                 }
 
                 $title = $item['title'] ?? null;
-                if (!$title && $product) {
+                if (! $title && $product) {
                     $title = $product->title;
                 }
 
@@ -387,10 +407,10 @@ class OrderController extends Controller
                         $imageUrl = $imagePath;
                     } else {
                         $relative = ltrim($imagePath, '/');
-                        $local = storage_path('app/public/' . $relative);
+                        $local = storage_path('app/public/'.$relative);
                         $imageUrl = rtrim((string) env('APP_URL', 'http://localhost:8000'), '/')
-                            . '/storage/'
-                            . $relative;
+                            .'/storage/'
+                            .$relative;
 
                         if (is_file($local)) {
                             $thumb = $this->makeEmailProductThumb($local, (int) ($product->id ?? 0));
@@ -444,16 +464,16 @@ class OrderController extends Controller
     {
         $order = Order::find($id);
 
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Riwayat pesanan tidak ditemukan'], 404);
         }
 
-        if (!auth()->user()?->is_admin && $order->user_id !== auth()->id()) {
+        if (! auth()->user()?->is_admin && $order->user_id !== auth()->id()) {
             return response()->json(['message' => 'Anda tidak diizinkan menghapus pesanan ini.'], 403);
         }
 
         $query = Order::where('created_at', $order->created_at);
-        if (!auth()->user()?->is_admin) {
+        if (! auth()->user()?->is_admin) {
             $query->where('user_id', auth()->id());
         }
         $deleted = $query->delete();
@@ -470,18 +490,19 @@ class OrderController extends Controller
             'status' => [
                 'required',
                 'string',
-                Rule::in(['menunggu_konfirmasi', 'pengemasan', 'dalam_perjalanan', 'diterima', 'dibatalkan', 'selesai'])
+                Rule::in(['menunggu_konfirmasi', 'pengemasan', 'dalam_perjalanan', 'diterima', 'dibatalkan', 'selesai']),
             ],
-            'metode_pembayaran' => 'sometimes|string|nullable'
+            'metode_pembayaran' => 'sometimes|string|nullable',
+            'payment_status' => ['sometimes', 'string', Rule::in(Order::PAYMENT_STATUSES)],
         ]);
 
         $order = Order::find($id);
 
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Pesanan tidak ditemukan.'], 404);
         }
 
-        if (!auth()->user()?->is_admin) {
+        if (! auth()->user()?->is_admin) {
             return response()->json(['message' => 'Anda tidak diizinkan memperbarui pesanan ini.'], 403);
         }
 
@@ -491,12 +512,24 @@ class OrderController extends Controller
             $order->metode_pembayaran = $request->metode_pembayaran;
         }
 
+        if ($request->filled('payment_status')) {
+            $order->payment_status = $request->string('payment_status')->toString();
+        } elseif ($request->status === 'dibatalkan') {
+            $order->payment_status = Order::PAYMENT_CANCELLED;
+        } elseif (
+            $order->payment_status === Order::PAYMENT_PENDING
+            && in_array($request->status, ['pengemasan', 'dalam_perjalanan', 'diterima', 'selesai'], true)
+        ) {
+            // COD / unpaid pending → treat as paid once fulfillment progresses.
+            $order->payment_status = Order::PAYMENT_SUCCESS;
+        }
+
         $order->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Data pesanan berhasil diperbarui.',
-            'data' => $order
+            'data' => $order,
         ], 200);
     }
 
@@ -505,7 +538,7 @@ class OrderController extends Controller
      */
     private function makeEmailProductThumb(string $sourcePath, int $productId): ?string
     {
-        if (!function_exists('imagecreatefromstring')) {
+        if (! function_exists('imagecreatefromstring')) {
             return null;
         }
 
@@ -515,7 +548,7 @@ class OrderController extends Controller
                 return null;
             }
             $src = @imagecreatefromstring($raw);
-            if (!$src) {
+            if (! $src) {
                 return null;
             }
 
@@ -523,6 +556,7 @@ class OrderController extends Controller
             $sh = imagesy($src);
             if ($sw < 1 || $sh < 1) {
                 imagedestroy($src);
+
                 return null;
             }
 
@@ -537,10 +571,10 @@ class OrderController extends Controller
             imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
 
             $dir = storage_path('app/email-thumbs');
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 @mkdir($dir, 0755, true);
             }
-            $out = $dir . '/product-' . ($productId ?: md5($sourcePath)) . '.jpg';
+            $out = $dir.'/product-'.($productId ?: md5($sourcePath)).'.jpg';
             imagejpeg($dst, $out, 78);
             imagedestroy($src);
             imagedestroy($dst);
@@ -551,6 +585,7 @@ class OrderController extends Controller
                 'path' => $sourcePath,
                 'detail' => $e->getMessage(),
             ]);
+
             return null;
         }
     }

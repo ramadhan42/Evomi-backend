@@ -174,7 +174,7 @@ class CmsController extends Controller
         }
 
         return (bool) preg_match(
-            '/(_mobile|_desktop|_color|_fs_|_size_|_rotate_|_pos_|_left_|_right_|_top_|_bottom_)/',
+            '/(_mobile|_desktop|_color|_fs_|_size_|_gap_|_rotate_|_pos_|_left_|_right_|_top_|_bottom_)/',
             $key
         );
     }
